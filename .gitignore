@@ -1,0 +1,10 @@
+node_modules/
+.env
+data/db.json
+**/dist/
+**/coverage/
+**/src/generated/
+data/receipts/
+*.log
+.env.*.local
+playwright-artifacts/

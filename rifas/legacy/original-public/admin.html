@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Halcón Airguns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="header-brand">
+        <svg class="header-logo" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="38" fill="#1a1a1a" stroke="#c8991a" stroke-width="2"/>
+          <g fill="#c8991a">
+            <ellipse cx="40" cy="36" rx="7" ry="14" transform="rotate(-15 40 36)"/>
+            <path d="M34 32 Q18 20 14 36 Q22 34 34 38Z"/>
+            <path d="M46 30 Q62 18 66 34 Q58 30 46 36Z"/>
+            <circle cx="44" cy="22" r="6"/>
+            <path d="M49 21 L54 24 L49 25Z"/>
+            <path d="M36 48 Q30 58 28 62 Q34 56 40 54 Q46 56 52 62 Q50 58 44 48Z"/>
+          </g>
+        </svg>
+        <div>
+          <div class="header-name">HALCÓN AIRGUNS</div>
+          <div class="header-tagline">PANEL DE ADMINISTRACIÓN</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <span id="admin-welcome"></span>
+        <a href="/" class="btn-logout">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Ir al sitio
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+
+    <!-- STATS GLOBALES -->
+    <div class="admin-stats" id="admin-stats">
+      <div class="astat astat-gold"><span class="astat-num" id="st-raffles">—</span><div class="astat-label">Rifas totales</div></div>
+      <div class="astat astat-green"><span class="astat-num" id="st-active">—</span><div class="astat-label">Activas</div></div>
+      <div class="astat astat-green"><span class="astat-num" id="st-sold">—</span><div class="astat-label">Tickets vendidos</div></div>
+      <div class="astat astat-gold"><span class="astat-num" id="st-pending">—</span><div class="astat-label">Reservados</div></div>
+      <div class="astat astat-green"><span class="astat-num" id="st-revenue">—</span><div class="astat-label">Recaudado</div></div>
+      <div class="astat"><span class="astat-num" id="st-users">—</span><div class="astat-label">Usuarios</div></div>
+    </div>
+
+    <!-- RIFAS -->
+    <div class="admin-card admin-card-full" style="margin-bottom:1.2rem">
+      <div class="admin-card-header" style="justify-content:space-between">
+        <span style="display:flex;align-items:center;gap:.6rem">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          Rifas
+        </span>
+        <button class="btn-primary" style="font-size:.82rem;padding:.5rem 1.1rem" onclick="openRaffleModal()">
+          + Nueva rifa
+        </button>
+      </div>
+      <div id="raffles-list" class="admin-raffles-list">
+        <div class="loading-row">Cargando...</div>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      <!-- USUARIOS -->
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Usuarios registrados
+        </div>
+        <div id="users-list" class="admin-list"><div class="loading-row">Cargando...</div></div>
+      </div>
+
+      <!-- TICKETS (por rifa seleccionada) -->
+      <div class="admin-card">
+        <div class="admin-card-header" style="justify-content:space-between">
+          <span style="display:flex;align-items:center;gap:.6rem">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+            Tickets
+          </span>
+          <select id="ticket-raffle-select" class="admin-select" onchange="loadTicketsForRaffle(this.value)">
+            <option value="">— Seleccioná una rifa —</option>
+          </select>
+        </div>
+        <div id="tickets-mini-list" class="admin-list">
+          <div class="loading-row">Seleccioná una rifa para ver sus tickets.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL CREAR/EDITAR RIFA -->
+  <div id="raffle-modal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:480px;text-align:left">
+      <h3 id="raffle-modal-title" style="text-align:center;margin-bottom:1.2rem">NUEVA RIFA</h3>
+      <form id="raffle-form" onsubmit="saveRaffle(event)">
+        <div class="form-row">
+          <label>Título de la rifa *</label>
+          <input type="text" id="rf-title" required placeholder="Ej: Rifa Halcón #2" maxlength="80" />
+        </div>
+        <div class="form-row">
+          <label>Premio principal *</label>
+          <input type="text" id="rf-prize" required placeholder="Ej: Carabina PCP Halcón" maxlength="80" />
+        </div>
+        <div class="form-row">
+          <label>Descripción del premio</label>
+          <textarea id="rf-desc" rows="2" placeholder="Sorteo en vivo, seguinos en @halcon_airguns2..." maxlength="200"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <div class="form-row">
+            <label>Precio por número (ARS) *</label>
+            <input type="number" id="rf-price" required min="1" placeholder="5000" />
+          </div>
+          <div class="form-row">
+            <label>Cantidad de números *</label>
+            <input type="number" id="rf-total" required min="1" max="10000" placeholder="100" />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Estado</label>
+          <select id="rf-status" class="admin-select" style="width:100%">
+            <option value="draft">Borrador (no visible)</option>
+            <option value="active">Activa (visible y abierta)</option>
+            <option value="finished">Finalizada</option>
+          </select>
+        </div>
+        <input type="hidden" id="rf-id" />
+        <div class="modal-actions" style="margin-top:1.2rem">
+          <button type="button" class="btn-secondary" onclick="closeRaffleModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" id="rf-submit">Crear rifa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-icon">⚠️</div>
+      <h3 id="modal-title"></h3>
+      <p id="modal-body"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button class="btn-danger" id="modal-confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

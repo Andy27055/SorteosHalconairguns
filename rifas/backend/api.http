@@ -1,0 +1,90 @@
+@base = http://localhost:3011/api
+@raffle = demo-rifa
+@order = REEMPLAZAR_ID_COMPRA
+@receipt = REEMPLAZAR_ID_COMPROBANTE
+
+### Salud y configuración pública
+GET {{base}}/health
+
+### Catálogo
+GET {{base}}/raffles
+
+### Disponibilidad: no entrega propietarios
+GET {{base}}/raffles/{{raffle}}/availability
+
+### Login de la cuenta local; REST Client lee variables de backend/.env
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"login":"{{$dotenv ADMIN_USERNAME}}","password":"{{$dotenv ADMIN_PASSWORD}}"}
+
+@token = {{login.response.body.token}}
+
+### Sesión
+GET {{base}}/auth/me
+Authorization: Bearer {{token}}
+
+### Reservar: ejecutar sólo en rifa de prueba
+POST {{base}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"raffleId":"{{raffle}}","numbers":[21,22]}
+
+### Mis compras
+GET {{base}}/orders
+Authorization: Bearer {{token}}
+
+### Transferencia; 503 hasta configurar datos de destino
+POST {{base}}/orders/{{order}}/transfer
+Authorization: Bearer {{token}}
+
+### Checkout; 503 hasta configurar proveedor y URL HTTPS
+POST {{base}}/orders/{{order}}/checkout
+Authorization: Bearer {{token}}
+
+### Conciliar estado con proveedor
+POST {{base}}/orders/{{order}}/reconcile
+Authorization: Bearer {{token}}
+
+### Revisar transferencia después de verificar acreditación real
+POST {{base}}/admin/orders/{{order}}/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"decision":"approve","note":"Acreditación verificada por el administrador."}
+
+### Descargar archivo privado
+GET {{base}}/receipts/{{receipt}}
+Authorization: Bearer {{token}}
+
+### 400 selección inválida
+POST {{base}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"raffleId":"{{raffle}}","numbers":[0,1.5,1,1]}
+
+### 401 sin sesión
+GET {{base}}/admin/raffles
+
+### 403: usar token de participante para endpoint administrativo
+GET {{base}}/admin/users
+Authorization: Bearer REEMPLAZAR_TOKEN_PARTICIPANTE
+
+### 404 inexistente
+GET {{base}}/raffles/no-existe
+
+### 409: repetir un número ya reservado
+POST {{base}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"raffleId":"{{raffle}}","numbers":[21]}
+
+### 401 webhook sin firma
+POST {{base}}/payments/webhook?data.id=123
+Content-Type: application/json
+
+{"type":"payment","data":{"id":"123"}}

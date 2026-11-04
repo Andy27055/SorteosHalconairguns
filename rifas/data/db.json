@@ -1,0 +1,51 @@
+{
+  "users": [
+    {
+      "username": "toto",
+      "password": "$2a$10$n8GplGjyOdzeIlCTyJLkjO8xQHAUy3mLd1EhDPCkDcvGA9TLUZWyC",
+      "createdAt": "2026-05-25T05:40:35.991Z"
+    },
+    {
+      "username": "admin",
+      "password": "$2a$10$0meCxPHRJdA/2AJq0kKUDu5zY/6/vS41bRP0rxCtVkfKXrFXFi9vO",
+      "createdAt": "2026-05-26T22:35:36.120Z"
+    },
+    {
+      "username": "toto1",
+      "password": "$2a$10$vmdNmBng9f8I1lFQLp5Bfen6WRVUF.TjOnOZISYwJ6zMfGmlKpouO",
+      "createdAt": "2026-05-26T22:50:41.290Z"
+    }
+  ],
+  "raffles": {
+    "rifa-halcon-2025": {
+      "id": "rifa-halcon-2025",
+      "title": "Rifa Halcón Airguns 2025",
+      "prize": "Carabina PCP Halcón",
+      "prizeDescription": "El número ganador será sorteado en vivo · Seguinos en @halcon_airguns2",
+      "ticketPrice": 5000,
+      "totalTickets": 100,
+      "status": "active",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    "rifa-36af2287": {
+      "id": "rifa-36af2287",
+      "title": "rifa prueba",
+      "prize": "PCP",
+      "prizeDescription": "sorteo prueba",
+      "ticketPrice": 100,
+      "totalTickets": 23,
+      "status": "active",
+      "createdAt": "2026-08-03T22:37:37.465Z"
+    }
+  },
+  "tickets": {
+    "rifa-halcon-2025": {
+      "7": {
+        "owner": "toto",
+        "status": "paid",
+        "boughtAt": "2026-05-25T05:51:45.840Z"
+      }
+    },
+    "rifa-36af2287": {}
+  }
+}

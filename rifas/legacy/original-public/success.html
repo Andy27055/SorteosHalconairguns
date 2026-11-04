@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pago confirmado — Halcón Airguns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .result-screen {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(58,125,68,.1) 0%, transparent 70%),
+                  linear-gradient(180deg, #0d0c09 0%, #080808 100%);
+    }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--green);
+      border-radius: var(--radius);
+      padding: 3rem 2.5rem;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 80px rgba(0,0,0,.7), 0 0 40px rgba(58,125,68,.08);
+    }
+    .result-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .result-title {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      letter-spacing: .1em;
+      color: var(--green-lt);
+      margin-bottom: .5rem;
+    }
+    .result-sub { color: var(--muted); font-size: .95rem; line-height: 1.6; margin-bottom: 1.5rem; }
+    .ticket-number {
+      font-family: var(--font-display);
+      font-size: 4rem;
+      color: var(--gold);
+      letter-spacing: .05em;
+      line-height: 1;
+      margin: 1rem 0;
+      text-shadow: 0 0 30px rgba(200,153,26,.3);
+    }
+    .ticket-label { font-size: .75rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+    .result-note {
+      background: rgba(58,125,68,.1);
+      border: 1px solid rgba(58,125,68,.3);
+      border-radius: 8px;
+      padding: .9rem 1.2rem;
+      font-size: .82rem;
+      color: var(--green-lt);
+      margin: 1.5rem 0;
+      line-height: 1.5;
+    }
+    .btn-back {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .85rem 2rem;
+      background: linear-gradient(135deg, var(--gold), var(--gold-dk));
+      color: #000;
+      border: none; border-radius: 8px;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: .1em;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .btn-back:hover { opacity: .88; }
+    .brand-mini {
+      display: flex; align-items: center; justify-content: center; gap: .6rem;
+      margin-bottom: 2rem;
+      opacity: .7;
+    }
+    .brand-mini svg { width: 32px; height: 32px; }
+    .brand-mini span { font-family: var(--font-display); font-size: 1rem; letter-spacing: .1em; color: var(--muted); }
+    .redirect-note { font-size: .72rem; color: var(--muted); margin-top: 1rem; }
+    .countdown { color: var(--gold); font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="result-screen">
+  <div class="result-card">
+    <div class="brand-mini">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="38" fill="#1a1a1a" stroke="#c8991a" stroke-width="2"/>
+        <g fill="#c8991a">
+          <ellipse cx="40" cy="36" rx="7" ry="14" transform="rotate(-15 40 36)"/>
+          <path d="M34 32 Q18 20 14 36 Q22 34 34 38Z"/>
+          <path d="M46 30 Q62 18 66 34 Q58 30 46 36Z"/>
+          <circle cx="44" cy="22" r="6"/>
+          <path d="M49 21 L54 24 L49 25Z"/>
+          <path d="M36 48 Q30 58 28 62 Q34 56 40 54 Q46 56 52 62 Q50 58 44 48Z"/>
+        </g>
+      </svg>
+      <span>HALCÓN AIRGUNS</span>
+    </div>
+
+    <div class="result-icon">✅</div>
+    <h1 class="result-title">¡PAGO CONFIRMADO!</h1>
+    <p class="result-sub">Tu número quedó reservado. ¡Buena suerte en el sorteo!</p>
+
+    <div class="ticket-label">tu número</div>
+    <div class="ticket-number" id="ticket-num">—</div>
+
+    <div class="result-note">
+      🦅 Seguinos en <strong>@halcon_airguns2</strong> para enterarte de la fecha del sorteo en vivo.
+    </div>
+
+    <a href="/" class="btn-back">← Volver a la rifa</a>
+    <p class="redirect-note">Redirigiendo automáticamente en <span class="countdown" id="countdown">8</span>s...</p>
+  </div>
+</div>
+
+<script>
+  // Leer parámetros que devuelve Mercado Pago
+  const params = new URLSearchParams(window.location.search);
+  const externalRef = params.get('external_reference') || '';
+  // external_reference: "username_num_timestamp"
+  const parts = externalRef.split('_');
+  if (parts.length >= 2) {
+    const num = parts[parts.length - 2];
+    if (num && !isNaN(num)) {
+      document.getElementById('ticket-num').textContent = num;
+    }
+  }
+
+  // Countdown y redirect
+  let secs = 8;
+  const cd = document.getElementById('countdown');
+  const timer = setInterval(() => {
+    secs--;
+    cd.textContent = secs;
+    if (secs <= 0) { clearInterval(timer); window.location.href = '/'; }
+  }, 1000);
+</script>
+</body>
+</html>

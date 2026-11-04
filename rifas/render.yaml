@@ -1,0 +1,39 @@
+# Ejemplo revisable. No se creó infraestructura. El disco requiere un plan compatible de pago.
+# Si el repo contiene Codigos/rifas como subcarpeta, ajustar dockerContext y dockerfilePath.
+services:
+  - type: web
+    name: halcon-airguns
+    runtime: docker
+    plan: starter
+    dockerContext: .
+    dockerfilePath: ./backend/Dockerfile.prod
+    healthCheckPath: /api/health
+    disk:
+      name: comprobantes-privados
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: RECEIPT_STORAGE_PATH
+        value: /app/data/receipts
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
+      - key: MP_SANDBOX
+        value: "true"
+      - key: TRANSFER_HOLDER
+        sync: false
+      - key: TRANSFER_ALIAS
+        sync: false
+      - key: TRANSFER_CBU
+        sync: false

@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  USER
+  ADMIN
+}
+enum RaffleStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+}
+enum OrderStatus {
+  RESERVED
+  PAYMENT_PENDING
+  AWAITING_RECEIPT
+  UNDER_REVIEW
+  PAID
+  REJECTED
+  CANCELLED
+  EXPIRED
+  NEEDS_ATTENTION
+  REFUNDED
+}
+enum PaymentMethod {
+  MERCADO_PAGO
+  TRANSFER
+}
+model User {
+  id String @id @default(cuid())
+  username String @unique
+  email String @unique
+  fullName String
+  dni String?
+  address String?
+  passwordHash String
+  role Role @default(USER)
+  tokenVersion Int @default(0)
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  orders Order[]
+}
+model Prize {
+  id String @id @default(cuid())
+  name String
+  description String @default("")
+  createdAt DateTime @default(now())
+  raffles Raffle[]
+}
+model Raffle {
+  id String @id @default(cuid())
+  title String
+  description String @default("")
+  prizeId String
+  prize Prize @relation(fields: [prizeId], references: [id], onDelete: Restrict)
+  ticketPriceCents Int
+  totalTickets Int
+  status RaffleStatus @default(DRAFT)
+  drawAt DateTime?
+  winnerNumber Int?
+  drawnAt DateTime?
+  createdAt DateTime @default(now())
+  orders Order[]
+  allocations Allocation[]
+}
+model Order {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  raffleId String
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Restrict)
+  numbers Int[]
+  unitPriceCents Int
+  amountCents Int
+  status OrderStatus @default(RESERVED)
+  method PaymentMethod?
+  expiresAt DateTime
+  preferenceId String? @unique
+  checkoutUrl String?
+  paymentId String? @unique
+  legacyReference String? @unique
+  paymentStatus String?
+  paymentCreatingAt DateTime?
+  decisionNote String?
+  paidAt DateTime?
+  reviewedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  allocations Allocation[]
+  receipts Receipt[]
+  @@index([status, expiresAt])
+  @@index([userId, createdAt])
+}
+model Allocation {
+  id String @id @default(cuid())
+  raffleId String
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Restrict)
+  number Int
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@unique([raffleId, number])
+}
+model Receipt {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  storageKey String @unique
+  mimeType String
+  size Int
+  sha256 String
+  uploadedAt DateTime @default(now())
+  deleteAfter DateTime
+  deletedAt DateTime?
+  @@index([deleteAfter, deletedAt])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String?
+  action String
+  entityId String
+  detail Json?
+  createdAt DateTime @default(now())
+}

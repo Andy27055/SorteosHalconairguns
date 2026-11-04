@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pago en proceso — Halcón Airguns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .result-screen {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(200,153,26,.08) 0%, transparent 70%),
+                  linear-gradient(180deg, #0d0c09 0%, #080808 100%);
+    }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold-dk);
+      border-radius: var(--radius);
+      padding: 3rem 2.5rem;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 80px rgba(0,0,0,.7);
+    }
+    .result-icon { font-size: 3.5rem; margin-bottom: 1rem; animation: spin-slow 3s linear infinite; display: inline-block; }
+    @keyframes spin-slow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .result-title {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      letter-spacing: .1em;
+      color: var(--gold);
+      margin-bottom: .5rem;
+    }
+    .result-sub { color: var(--muted); font-size: .95rem; line-height: 1.6; margin-bottom: 1.5rem; }
+    .result-note {
+      background: rgba(200,153,26,.08);
+      border: 1px solid rgba(200,153,26,.25);
+      border-radius: 8px;
+      padding: .9rem 1.2rem;
+      font-size: .82rem;
+      color: var(--gold);
+      margin: 1.5rem 0;
+      line-height: 1.5;
+    }
+    .btn-back {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .85rem 2rem;
+      background: linear-gradient(135deg, var(--gold), var(--gold-dk));
+      color: #000;
+      border: none; border-radius: 8px;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: .1em;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .btn-back:hover { opacity: .88; }
+    .brand-mini {
+      display: flex; align-items: center; justify-content: center; gap: .6rem;
+      margin-bottom: 2rem;
+      opacity: .7;
+    }
+    .brand-mini svg { width: 32px; height: 32px; }
+    .brand-mini span { font-family: var(--font-display); font-size: 1rem; letter-spacing: .1em; color: var(--muted); }
+    .redirect-note { font-size: .72rem; color: var(--muted); margin-top: 1rem; }
+    .countdown { color: var(--gold); font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="result-screen">
+  <div class="result-card">
+    <div class="brand-mini">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="38" fill="#1a1a1a" stroke="#c8991a" stroke-width="2"/>
+        <g fill="#c8991a">
+          <ellipse cx="40" cy="36" rx="7" ry="14" transform="rotate(-15 40 36)"/>
+          <path d="M34 32 Q18 20 14 36 Q22 34 34 38Z"/>
+          <path d="M46 30 Q62 18 66 34 Q58 30 46 36Z"/>
+          <circle cx="44" cy="22" r="6"/>
+          <path d="M49 21 L54 24 L49 25Z"/>
+          <path d="M36 48 Q30 58 28 62 Q34 56 40 54 Q46 56 52 62 Q50 58 44 48Z"/>
+        </g>
+      </svg>
+      <span>HALCÓN AIRGUNS</span>
+    </div>
+
+    <div class="result-icon">⏳</div>
+    <h1 class="result-title">PAGO EN PROCESO</h1>
+    <p class="result-sub">Tu pago está siendo procesado por Mercado Pago. Esto puede tardar unos minutos.</p>
+
+    <div class="result-note">
+      ⚡ Cuando el pago se confirme, tu número quedará reservado automáticamente. Si ya pagaste podés volver a la rifa y verás tu número como "Pendiente".
+    </div>
+
+    <a href="/" class="btn-back">← Volver a la rifa</a>
+    <p class="redirect-note">Redirigiendo automáticamente en <span class="countdown" id="countdown">10</span>s...</p>
+  </div>
+</div>
+
+<script>
+  let secs = 10;
+  const cd = document.getElementById('countdown');
+  const timer = setInterval(() => {
+    secs--;
+    cd.textContent = secs;
+    if (secs <= 0) { clearInterval(timer); window.location.href = '/'; }
+  }, 1000);
+</script>
+</body>
+</html>

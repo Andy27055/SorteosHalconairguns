@@ -1,0 +1,374 @@
+/* ─── ADMIN PANEL ───────────────────────────────────── */
+
+.admin-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.8rem 1.5rem 3rem;
+}
+
+/* ── STATS ROW ── */
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: .9rem;
+  margin-bottom: 1.8rem;
+}
+
+.astat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1rem .9rem;
+  text-align: center;
+}
+.astat-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: .3rem;
+}
+.astat-label {
+  font-size: .7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.astat-green .astat-num { color: var(--green-lt); }
+.astat-gold  .astat-num { color: var(--gold); }
+
+/* ── GRID 2 COL ── */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+@media (max-width: 720px) { .admin-grid { grid-template-columns: 1fr; } }
+
+/* ── CARDS ── */
+.admin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.admin-card-full { grid-column: 1 / -1; }
+
+.admin-card-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .85rem 1.2rem;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-size: .9rem;
+  letter-spacing: .06em;
+  color: var(--gold-lt);
+}
+
+/* ── CONFIG FORM ── */
+.admin-card form { padding: 1rem 1.2rem 1.2rem; }
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  margin-bottom: .95rem;
+}
+.form-row label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.form-row input,
+.form-row textarea {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: .6rem .8rem;
+  font-family: var(--font-body);
+  font-size: .9rem;
+  outline: none;
+  transition: border-color .2s;
+  resize: vertical;
+}
+.form-row input:focus,
+.form-row textarea:focus { border-color: var(--gold-dk); }
+.form-hint { font-size: .68rem; color: var(--muted); }
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: .3rem;
+}
+.save-msg {
+  font-size: .8rem;
+  color: var(--green-lt);
+  font-weight: 600;
+}
+
+/* ── USERS LIST ── */
+.admin-list { padding: .5rem 0; }
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .55rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .85rem;
+}
+.user-row:last-child { border-bottom: none; }
+.user-name { flex: 1; font-weight: 500; }
+.user-date { font-size: .72rem; color: var(--muted); }
+.badge-admin {
+  background: rgba(200,153,26,.15);
+  color: var(--gold);
+  border: 1px solid rgba(200,153,26,.3);
+  border-radius: 4px;
+  font-size: .62rem;
+  padding: 1px 5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  vertical-align: middle;
+  margin-left: .3rem;
+}
+
+/* ── FILTER TABS ── */
+.filter-tabs { display: flex; gap: .4rem; }
+.filter-btn {
+  padding: .3rem .75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: .75rem;
+  cursor: pointer;
+  transition: all .2s;
+}
+.filter-btn.active,
+.filter-btn:hover { border-color: var(--gold-dk); color: var(--gold-lt); background: rgba(200,153,26,.08); }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x: auto; }
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .85rem;
+}
+.admin-table th {
+  text-align: left;
+  padding: .6rem 1rem;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: .65rem 1rem;
+  border-bottom: 1px solid rgba(42,38,32,.6);
+  vertical-align: middle;
+}
+.admin-table tr:last-child td { border-bottom: none; }
+.admin-table tr:hover td { background: rgba(255,255,255,.02); }
+
+.ticket-num {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold-lt);
+}
+.date-cell { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+.payid {
+  font-size: .72rem;
+  color: var(--muted);
+  font-family: monospace;
+  word-break: break-all;
+}
+.loading-row { text-align: center; color: var(--muted); padding: 1.5rem; }
+
+.btn-table-del {
+  background: transparent;
+  border: 1px solid rgba(224,84,84,.3);
+  color: #e05454;
+  border-radius: 6px;
+  padding: .35rem .5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all .2s;
+}
+.btn-table-del:hover { background: rgba(224,84,84,.12); border-color: #e05454; }
+
+/* ── DANGER BUTTON ── */
+.btn-danger {
+  padding: .65rem 1.4rem;
+  background: linear-gradient(135deg, #e05454, #b03030);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: .9rem;
+  letter-spacing: .06em;
+  transition: opacity .2s;
+}
+.btn-danger:hover { opacity: .85; }
+
+/* ── RAFFLE LIST (admin) ── */
+.admin-raffles-list { padding: .4rem 0; }
+
+.raffle-admin-row {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .85rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.raffle-admin-row:last-child { border-bottom: none; }
+.raffle-admin-row:hover { background: rgba(255,255,255,.02); }
+
+.raffle-admin-main { flex: 1; min-width: 0; }
+
+.raffle-admin-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: .35rem;
+}
+
+.raffle-admin-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: .04em;
+  color: var(--text);
+}
+
+.raffle-admin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem 1.1rem;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.raffle-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-shrink: 0;
+}
+
+/* ── RAFFLE BADGE ── */
+.raffle-badge {
+  display: inline-block;
+  border-radius: 4px;
+  font-size: .62rem;
+  padding: 2px 6px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.badge-active   { background: rgba(56,202,99,.15); color: #38ca63; border: 1px solid rgba(56,202,99,.3); }
+.badge-draft    { background: rgba(180,180,180,.1); color: var(--muted); border: 1px solid var(--border); }
+.badge-finished { background: rgba(200,153,26,.12); color: var(--gold); border: 1px solid rgba(200,153,26,.3); }
+
+/* ── PROGRESS BAR (admin list) ── */
+.raffle-progress-bar {
+  background: var(--surface3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.raffle-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dk), var(--gold));
+  border-radius: 99px;
+  transition: width .4s;
+}
+
+/* ── TABLE ACTION BUTTONS ── */
+.btn-table-edit {
+  background: transparent;
+  border: 1px solid rgba(200,153,26,.3);
+  color: var(--gold-lt);
+  border-radius: 6px;
+  padding: .35rem .5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all .2s;
+}
+.btn-table-edit:hover { background: rgba(200,153,26,.12); border-color: var(--gold); }
+
+.btn-table-view {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: .35rem .5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: all .2s;
+}
+.btn-table-view:hover { background: rgba(255,255,255,.05); border-color: var(--text); color: var(--text); }
+
+/* ── SELECT ── */
+.admin-select {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: .4rem .7rem;
+  font-family: var(--font-body);
+  font-size: .82rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.admin-select:focus { border-color: var(--gold-dk); }
+.admin-select option { background: var(--surface2); }
+
+/* ── TICKET BADGES ── */
+.badge {
+  display: inline-block;
+  border-radius: 4px;
+  font-size: .62rem;
+  padding: 2px 5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+.badge-paid    { background: rgba(56,202,99,.15); color: #38ca63; border: 1px solid rgba(56,202,99,.3); }
+.badge-pending { background: rgba(200,153,26,.12); color: var(--gold); border: 1px solid rgba(200,153,26,.3); }
+
+/* ── MODAL OVERLAY (for raffle modal) ── */
+.modal-overlay { z-index: 1000; }
+
+/* ── ADMIN LINK IN HEADER ── */
+.btn-admin {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .9rem;
+  background: rgba(200,153,26,.12);
+  border: 1px solid rgba(200,153,26,.35);
+  color: var(--gold-lt);
+  border-radius: 7px;
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-admin:hover { background: rgba(200,153,26,.2); border-color: var(--gold); }

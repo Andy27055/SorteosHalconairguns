@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-halcon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-halcon}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-halcon}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-halcon}
+      JWT_SECRET: ${JWT_SECRET:?Definir JWT_SECRET en .env}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3001}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      MP_SANDBOX: ${MP_SANDBOX:-true}
+      TRANSFER_HOLDER: ${TRANSFER_HOLDER:-}
+      TRANSFER_ALIAS: ${TRANSFER_ALIAS:-}
+      TRANSFER_CBU: ${TRANSFER_CBU:-}
+      RECEIPT_STORAGE_PATH: /app/data/receipts
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/src:/app/backend/src
+      - ./backend/prisma:/app/backend/prisma
+      - receipt_data:/app/data/receipts
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run dev"]
+volumes:
+  postgres_data:
+  receipt_data:

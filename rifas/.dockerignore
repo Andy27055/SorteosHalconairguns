@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/src/generated
+**/.env
+.env
+.env.*
+**/.env.*
+.git
+Apuntes
+data
+legacy
+playwright-artifacts

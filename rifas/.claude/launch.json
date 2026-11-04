@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rifas",
+      "runtimeExecutable": "npm",
+      "env": { "PORT": "3011" },
+      "runtimeArgs": ["start"],
+      "port": 3011
+    }
+  ]
+}

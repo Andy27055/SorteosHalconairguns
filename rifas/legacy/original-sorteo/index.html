@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sorteo - Halcon Airguns</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(145deg, #0d0b07 0%, #1a150d 30%, #2a2015 60%, #1a150d 100%);
+      color: #f5e6c8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* Fondo con patrón sutil */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(200, 149, 46, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(200, 149, 46, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(200, 149, 46, 0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      background: linear-gradient(170deg, rgba(42, 32, 18, 0.9) 0%, rgba(26, 21, 13, 0.95) 100%);
+      border: 1px solid rgba(200, 149, 46, 0.3);
+      border-radius: 20px;
+      padding: 40px 35px;
+      box-shadow:
+        0 0 40px rgba(200, 149, 46, 0.08),
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(200, 149, 46, 0.15);
+    }
+
+    /* Logo */
+    .logo-container {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .logo-container img {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow:
+        0 0 20px rgba(200, 149, 46, 0.3),
+        0 0 40px rgba(200, 149, 46, 0.1);
+      border: 2px solid rgba(200, 149, 46, 0.4);
+    }
+
+    /* Título */
+    h2 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, #e8c564 0%, #c8952e 40%, #f0d878 70%, #c8952e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: rgba(200, 149, 46, 0.6);
+      letter-spacing: 1px;
+      margin-bottom: 30px;
+      font-weight: 400;
+    }
+
+    /* Separador dorado */
+    .divider {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #c8952e, transparent);
+      margin: 0 auto 30px;
+    }
+
+    /* Formulario */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #c8952e;
+      margin-bottom: 8px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 14px 18px;
+      background: rgba(13, 11, 7, 0.7);
+      border: 1px solid rgba(200, 149, 46, 0.2);
+      border-radius: 10px;
+      color: #f5e6c8;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .form-group input::placeholder {
+      color: rgba(200, 149, 46, 0.35);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: #c8952e;
+      box-shadow: 0 0 15px rgba(200, 149, 46, 0.15), inset 0 0 15px rgba(200, 149, 46, 0.05);
+      background: rgba(13, 11, 7, 0.9);
+    }
+
+    .form-group select {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23c8952e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 40px;
+    }
+
+    .form-group select option {
+      background: #1a150d;
+      color: #f5e6c8;
+    }
+
+    /* Botón */
+    button[type="submit"] {
+      width: 100%;
+      padding: 16px;
+      margin-top: 10px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #0d0b07;
+      background: linear-gradient(135deg, #e8c564 0%, #c8952e 50%, #b8860b 100%);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button[type="submit"]:hover {
+      background: linear-gradient(135deg, #f0d878 0%, #d4a43a 50%, #c8952e 100%);
+      box-shadow: 0 0 25px rgba(200, 149, 46, 0.4), 0 5px 20px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+    }
+
+    button[type="submit"]:active {
+      transform: translateY(0);
+      box-shadow: 0 0 15px rgba(200, 149, 46, 0.3);
+    }
+
+    /* Mensaje */
+    #mensaje {
+      text-align: center;
+      margin-top: 20px;
+      padding: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      min-height: 24px;
+      transition: all 0.3s ease;
+    }
+
+    #mensaje.success {
+      color: #7dce82;
+      background: rgba(125, 206, 130, 0.08);
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(125, 206, 130, 0.2);
+    }
+
+    #mensaje.error {
+      color: #e85d5d;
+      background: rgba(232, 93, 93, 0.08);
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(232, 93, 93, 0.2);
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(200, 149, 46, 0.1);
+    }
+
+    .footer img {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+    }
+
+    .footer img:hover {
+      opacity: 0.8;
+    }
+
+    .footer p {
+      font-size: 0.7rem;
+      color: rgba(200, 149, 46, 0.3);
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* Loading state */
+    .loading button[type="submit"] {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    /* Responsive */
+    @media (max-width: 520px) {
+      .container {
+        padding: 30px 22px;
+        border-radius: 16px;
+      }
+
+      h2 {
+        font-size: 1.3rem;
+        letter-spacing: 2px;
+      }
+
+      .logo-container img {
+        width: 110px;
+        height: 110px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-container">
+      <img src="logo.png" alt="Halcon Airguns">
+    </div>
+
+    <h2>Inscripción al Sorteo</h2>
+    <p class="subtitle">Completá tus datos y elegí tu número</p>
+    <div class="divider"></div>
+
+    <form id="formulario">
+      <div class="form-group">
+        <label for="nombre">Nombre</label>
+        <input type="text" name="nombre" id="nombre" placeholder="Tu nombre" required>
+      </div>
+
+      <div class="form-group">
+        <label for="apellido">Apellido</label>
+        <input type="text" name="apellido" id="apellido" placeholder="Tu apellido" required>
+      </div>
+
+      <div class="form-group">
+        <label for="dni">DNI</label>
+        <input type="text" name="dni" id="dni" placeholder="Tu número de DNI" required>
+      </div>
+
+      <div class="form-group">
+        <label for="domicilio">Domicilio</label>
+        <input type="text" name="domicilio" id="domicilio" placeholder="Tu domicilio" required>
+      </div>
+
+      <div class="form-group">
+        <label for="numero">Elegí tu número</label>
+        <select id="numero" name="numero" required>
+          <option value="" disabled selected>Cargando números...</option>
+        </select>
+      </div>
+
+      <button type="submit">Participar</button>
+    </form>
+
+    <p id="mensaje"></p>
+
+    <div class="footer">
+      <img src="logo.png" alt="Halcon Airguns">
+      <p>HALCON AIRGUNS © 2026</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

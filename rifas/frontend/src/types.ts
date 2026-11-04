@@ -1,0 +1,11 @@
+export interface User { id: string; username: string; email: string; fullName: string; role: 'USER' | 'ADMIN'; active?: boolean; createdAt?: string; dni?: string; address?: string }
+export interface Prize { id: string; name: string; description: string }
+export interface Raffle { id: string; title: string; description: string; prize: Prize; prizeId: string; ticketPriceCents: number; totalTickets: number; status: 'DRAFT' | 'ACTIVE' | 'FINISHED'; drawAt?: string | null; winnerNumber?: number | null; drawnAt?: string; sold?: number; available?: number }
+export interface Receipt { id: string; mimeType: string; size: number; uploadedAt: string; deleteAfter: string; deletedAt?: string | null }
+export type OrderStatus = 'RESERVED' | 'PAYMENT_PENDING' | 'AWAITING_RECEIPT' | 'UNDER_REVIEW' | 'PAID' | 'REJECTED' | 'CANCELLED' | 'EXPIRED' | 'NEEDS_ATTENTION' | 'REFUNDED';
+export interface Order { id: string; userId: string; user?: User; raffle: Raffle; raffleId: string; numbers: number[]; unitPriceCents: number; amountCents: number; status: OrderStatus; method?: 'MERCADO_PAGO' | 'TRANSFER'; expiresAt: string; createdAt: string; paidAt?: string; receipts?: Receipt[]; decisionNote?: string; checkoutUrl?: string }
+export interface Page<T> { items: T[]; total: number; page: number }
+export interface PaymentConfig { mercadoPago: boolean; sandbox: boolean; transfer: boolean; transferAlias: string; transferCbu: string; transferHolder: string; receiptMaxMb: number; receiptRetentionMonths: number }
+export const money = (cents: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+export const date = (value: string) => new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date(value));
+export const statusLabels: Record<OrderStatus, string> = { RESERVED: 'Reservada', PAYMENT_PENDING: 'Pago pendiente', AWAITING_RECEIPT: 'Falta comprobante', UNDER_REVIEW: 'En revisión', PAID: 'Pago confirmado', REJECTED: 'Rechazada', CANCELLED: 'Cancelada', EXPIRED: 'Reserva vencida', NEEDS_ATTENTION: 'Requiere atención', REFUNDED: 'Devuelta / contracargo' };
