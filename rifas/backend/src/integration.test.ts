@@ -24,8 +24,8 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('integración PostgreSQL aisl
     if(!connectionString)throw new Error('Definí TEST_DATABASE_URL o DATABASE_URL.');
     await pool.query(`CREATE SCHEMA "${schema}"`);const client=await pool.connect();
     try{await client.query(`SET search_path TO "${schema}"`);for(const folder of (await fs.readdir('prisma/migrations')).sort()){const sql=await fs.readFile(path.join('prisma/migrations',folder,'migration.sql'),'utf8').catch(()=>null);if(sql)await client.query(sql);}}finally{client.release();}
-    userId=(await db.user.create({data:{username:'db-user',email:'user@example.com',fullName:'Usuario Test',passwordHash:'not-used'}})).id;
-    otherId=(await db.user.create({data:{username:'db-other',email:'other@example.com',fullName:'Otro Test',passwordHash:'not-used'}})).id;
+    userId=(await db.user.create({data:{username:'db-user',email:'user@example.com',fullName:'Usuario Test',firstName:'Usuario',lastName:'Test',dni:'12345678',passwordHash:'not-used'}})).id;
+    otherId=(await db.user.create({data:{username:'db-other',email:'other@example.com',fullName:'Otro Test',firstName:'Otro',lastName:'Test',dni:'23456789',passwordHash:'not-used'}})).id;
     const prize=await db.prize.create({data:{name:'Premio de prueba'}});
     raffleId=(await db.raffle.create({data:{title:'Rifa prueba',prizeId:prize.id,totalTickets:100,ticketPriceCents:500000,status:'ACTIVE'}})).id;
     orderService=new OrdersService(db);

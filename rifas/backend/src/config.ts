@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { z } from 'zod';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
@@ -18,6 +19,13 @@ export const config = {
   transferAlias: process.env.TRANSFER_ALIAS || '',
   transferCbu: process.env.TRANSFER_CBU || '',
   transferHolder: process.env.TRANSFER_HOLDER || '',
+  smtpEnabled: process.env.SMTP_ENABLED === 'true',
+  smtpHost: process.env.SMTP_HOST || '',
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPass: process.env.SMTP_PASS || '',
+  smtpFrom: process.env.SMTP_FROM || '',
   receiptDir: path.resolve(process.env.RECEIPT_STORAGE_PATH || path.join(root, '..', 'data', 'receipts')),
   frontendDist: path.resolve(root, '..', 'frontend', 'dist'),
 };
@@ -27,5 +35,6 @@ export function validateConfig() {
   if (config.production && !process.env.DATABASE_URL) throw new Error('Falta DATABASE_URL.');
   if (config.production && (!config.frontendUrl.startsWith('https://') || !config.apiUrl.startsWith('https://'))) throw new Error('Las URLs públicas deben usar HTTPS.');
   if (config.mpToken && (!config.mpWebhookSecret || !config.apiUrl.startsWith('https://'))) throw new Error('Para Mercado Pago configurá MP_WEBHOOK_SECRET y PUBLIC_API_URL HTTPS.');
+  if (config.smtpEnabled && (!config.smtpHost || !z.email().safeParse(config.smtpFrom).success || !Number.isInteger(config.smtpPort) || config.smtpPort < 1 || config.smtpPort > 65535)) throw new Error('Completá SMTP_HOST, un email SMTP_FROM válido y un puerto válido antes de habilitar los correos.');
   if (config.production && (process.env.ADMIN_PASSWORD || '').length > 0) console.warn('Retirá ADMIN_PASSWORD del entorno después de ejecutar el seed.');
 }

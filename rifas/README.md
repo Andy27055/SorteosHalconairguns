@@ -2,6 +2,8 @@
 
 React + TypeScript + Vite, Express + JWT, PostgreSQL + Prisma, Mercado Pago Checkout Pro y transferencia con comprobante privado y revisión administrativa. El diseño usa el logo original, negro y dorado, en escritorio y celular.
 
+Actualización 07/11/2026: el cliente entra directamente al catálogo de rifas, también después del login. Una sola rifa tiene una tarjeta destacada; se conserva el listado de varias. Se mejoró el uso desde teléfonos, la selección de números, la vista previa del comprobante y la copia del enlace de pago. Los datos de transferencia y las credenciales de Mercado Pago quedan pendientes hasta que el usuario los reciba: ver [continuidad](Documentacion/08-CONTINUIDAD.md).
+
 ## Estado local
 
 La instalación de esta sesión usa PostgreSQL en Docker, puerto **5434**, y la aplicación compilada en **http://localhost:3011** para no interferir con otro servidor que ya ocupaba 3001. La configuración está en `.env` y `backend/.env`, excluidos de Git. La cuenta inicial local es `halcon-admin`; su contraseña aleatoria está en `ADMIN_PASSWORD` de `backend/.env`. No se publica ni se imprime en la consola. La rifa inicial está identificada como **demostración**, sin cobros habilitados.
@@ -26,6 +28,12 @@ Requisitos: Node 22.12 o posterior y Docker Desktop con el motor Linux activo.
 7. `npm run dev` para desarrollo; `npm start` para servir la compilación de frontend junto a la API.
 
 `SEED_DEMO=true` crea una rifa de demostración; no representa un premio real. El usuario de prueba opcional requiere `DEMO_EMAIL` y `DEMO_PASSWORD`, sin claves fijas versionadas.
+
+## Reservas, compradores y confirmaciones
+
+Los visitantes pueden apartar números por diez minutos mientras ingresan o se registran; al autenticarse continúan con la misma compra. Antes del pago se confirman email, nombre, apellido y DNI. El administrador dispone de **Administración → Compradores** para consultar ventas confirmadas por rifa y descargar sus datos en un Excel `.xlsx`.
+
+Cada pago confirmado deja en cola un correo con lo comprado. **El envío real requiere configurar SMTP y activar `SMTP_ENABLED`; inicialmente está deshabilitado.** Las fallas se reintentan sin alterar la compra. Ver [recorrido, configuración y límites](Documentacion/09-RESERVAS-COMPRADORES-CORREOS.md).
 
 ## Mercado Pago
 

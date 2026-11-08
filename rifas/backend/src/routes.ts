@@ -1,3 +1,6 @@
+import { guestRouter } from './guest-routes.js';
+import { buyerRouter } from './buyer-routes.js';
+import { queuePurchaseEmail } from './services/purchase-emails.js';
 import { Router } from 'express';
 import type { PrismaClient } from './generated/prisma/client.js';
 import bcrypt from 'bcryptjs';
@@ -9,7 +12,7 @@ import { z } from 'zod';
 import type { AppConfig } from './config.js';
 import { AppError, asyncRoute } from './errors.js';
 import { authentication, requireAdmin, owned, publicUser, issueToken, cookieOptions } from './auth.js';
-import { idSchema, registerSchema, loginSchema, raffleSchema, prizeSchema, reservationSchema, reviewSchema, roleSchema, profileSchema } from './schemas.js';
+import { idSchema, registerSchema, loginSchema, raffleSchema, prizeSchema, reservationSchema, reviewSchema, roleSchema, profileSchema, identityFields, buyerSchema } from './schemas.js';
 import { atomic } from './db.js';
 import { OrdersService, expireOrders } from './services/orders.js';
 import { PaymentsService, type PaymentGateway, validWebhook } from './services/payments.js';
@@ -21,6 +24,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   const router = Router();
   const auth = authentication(db, cfg);
   const orders = new OrdersService(db);
+  router.use('/guest-reservations', guestRouter(db, cfg));
   const payments = new PaymentsService(db, cfg, gateway);
   const receipts = new ReceiptsService(db, cfg.receiptDir);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 } });
@@ -37,7 +41,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     const input = registerSchema.parse(req.body);
     const { password, ...data } = input;
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await db.user.create({ data: { ...data, passwordHash, role: 'USER' } });
+    const user = await db.user.create({ data: { ...data, passwordHash, ...identityFields(data), role: 'USER' } });
     res.status(201).json(issueToken(user, res, cfg));
   }));
   router.post('/auth/login', authLimit, asyncRoute(async (req, res) => {
@@ -55,7 +59,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     res.clearCookie('halcon_token', { ...cookieOptions(cfg), maxAge: undefined }); res.json({ ok: true });
   }));
   router.get('/profile', auth, (req, res) => { const u = req.user!; res.json({ ...publicUser(u), dni: u.dni, address: u.address }); });
-  router.put('/profile', auth, asyncRoute(async (req, res) => res.json(publicUser(await db.user.update({ where: { id: req.user!.id }, data: profileSchema.parse(req.body) })))));
+  router.put('/profile', auth, asyncRoute(async (req, res) => res.json(publicUser(await db.user.update({ where: { id: req.user!.id }, data: (() => { const data = profileSchema.parse(req.body); return { ...data, ...identityFields(data) }; })() })))));
   router.put('/profile/password', auth, authLimit, asyncRoute(async (req, res) => {
     const data = z.object({ currentPassword: z.string().max(128), password: registerSchema.shape.password }).parse(req.body);
     if (!await bcrypt.compare(data.currentPassword, req.user!.passwordHash)) throw new AppError(400, 'La contraseña actual no es correcta.');
@@ -94,6 +98,15 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     if (!order) throw new AppError(404, 'Compra no encontrada.'); owned(req, order.userId); res.json(order);
   }));
   router.delete('/orders/:id', auth, actionLimit, asyncRoute(async (req, res) => res.json(await orders.cancel(req.user!.id, idSchema.parse(req.params.id)))));
+  router.put('/orders/:id/buyer', auth, asyncRoute(async (req,res)=>{
+    const id=idSchema.parse(req.params.id); const identity=buyerSchema.parse(req.body);
+    await atomic(db,async tx=>{
+      const order=await tx.order.findUniqueOrThrow({where:{id}});
+      if(order.userId!==req.user!.id) throw new AppError(403,'No es tu compra.');
+      if(order.status!=='RESERVED'||order.method||order.paymentCreatingAt) throw new AppError(409,'Los datos de esta compra ya fueron confirmados.');
+      await tx.user.update({where:{id:req.user!.id},data:{...identity,fullName:`${identity.firstName} ${identity.lastName}`}});
+    });res.json({ok:true});
+  }));
   router.post('/orders/:id/checkout', auth, actionLimit, asyncRoute(async (req, res) => res.json(await payments.checkout(req.user!.id, idSchema.parse(req.params.id)))));
   router.post('/orders/:id/reconcile', auth, actionLimit, asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id);
@@ -126,6 +139,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     res.sendStatus(200);
   }));
   router.use('/admin', auth, requireAdmin);
+  router.use('/admin', buyerRouter(db, cfg));
   router.get('/admin/stats', asyncRoute(async (_req, res) => {
     const revenue = await db.order.aggregate({ where: { status: 'PAID' }, _sum: { amountCents: true } });
     res.json({ raffles: await db.raffle.count(), users: await db.user.count({ where: { active: true } }), pendingReviews: await db.order.count({ where: { status: 'UNDER_REVIEW' } }), attention: await db.order.count({ where: { status: 'NEEDS_ATTENTION' } }), revenueCents: revenue._sum.amountCents || 0 });
@@ -202,6 +216,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
         await tx.allocation.deleteMany({ where: { orderId: id } });
       }
       const result = await tx.order.update({ where: { id }, data: { status: data.decision === 'assign' ? 'PAID' : 'REFUNDED', paidAt: data.decision === 'assign' ? new Date() : order.paidAt, decisionNote: data.note, reviewedBy: req.user!.id } });
+      if (data.decision === 'assign') await queuePurchaseEmail(tx, id);
       await tx.auditLog.create({ data: { actorId: req.user!.id, action: data.decision === 'assign' ? 'PAYMENT_ASSIGNED_MANUALLY' : 'EXTERNAL_REFUND_RECORDED', entityId: id, detail: { note: data.note } } }); return result;
     }));
   }));
@@ -209,7 +224,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.get('/admin/users/:id', asyncRoute(async (req, res) => res.json(await db.user.findUniqueOrThrow({ where: { id: idSchema.parse(req.params.id) }, select: userSelect }))));
   router.post('/admin/users', asyncRoute(async (req, res) => {
     const data = registerSchema.parse(req.body); const { password, ...userData } = data;
-    res.status(201).json(await db.user.create({ data: { ...userData, passwordHash: await bcrypt.hash(password, 12), role: 'USER' }, select: userSelect }));
+    res.status(201).json(await db.user.create({ data: { ...userData, passwordHash: await bcrypt.hash(password, 12), ...identityFields(userData), role: 'USER' }, select: userSelect }));
   }));
   router.put('/admin/users/:id', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id); const data = roleSchema.parse(req.body);

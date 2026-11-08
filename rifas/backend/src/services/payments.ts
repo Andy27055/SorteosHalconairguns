@@ -1,3 +1,5 @@
+import { buyerSnapshot } from './buyer-identity.js';
+import { queuePurchaseEmail } from './purchase-emails.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { AppConfig } from '../config.js';
@@ -52,7 +54,8 @@ export class PaymentsService {
       if (order.checkoutUrl && order.status === 'PAYMENT_PENDING') return { order, ready: true, recover: false };
       if (!['RESERVED', 'PAYMENT_PENDING'].includes(order.status) || order.method === 'TRANSFER' || order.raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta compra no admite iniciar un pago.');
       if (order.paymentCreatingAt && Date.now() - order.paymentCreatingAt.getTime() < 30000) throw new AppError(409, 'El enlace se está preparando. Esperá unos segundos y volvé a consultar.');
-      await tx.order.update({ where: { id }, data: { method: 'MERCADO_PAGO', status: 'PAYMENT_PENDING', paymentCreatingAt: new Date(), expiresAt: new Date(Date.now() + 30 * 60000) } });
+      const identity = order.buyerEmail && order.buyerFirstName && order.buyerLastName && order.buyerDni ? {} : await buyerSnapshot(tx, order.userId);
+      await tx.order.update({ where: { id }, data: { ...identity, method: 'MERCADO_PAGO', status: 'PAYMENT_PENDING', paymentCreatingAt: new Date(), expiresAt: new Date(Date.now() + 30 * 60000) } });
       return { order, ready: false, recover: !!order.paymentCreatingAt };
     });
     if (claim.ready) return { checkoutUrl: claim.order.checkoutUrl };
@@ -96,6 +99,7 @@ export class PaymentsService {
           await markAttention('Pago aprobado después de perder la reserva. Requiere asignación o devolución manual.'); return;
         }
         await tx.order.update({ where: { id: order.id }, data: { status: 'PAID', paidAt: new Date(), paymentId: String(payment.id), paymentStatus: payment.status, decisionNote: null } });
+        await queuePurchaseEmail(tx, order.id);
       } else if (['refunded','charged_back'].includes(payment.status)) {
         // No se revenden números pagados: se conserva la asignación para auditoría/sorteo.
         await tx.order.update({ where: { id: order.id }, data: { status: 'REFUNDED', paymentId: String(payment.id), paymentStatus: payment.status } });

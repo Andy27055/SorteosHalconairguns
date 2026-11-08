@@ -24,3 +24,8 @@ export async function downloadReceipt(id: string) {
   const a = document.createElement('a'); a.href = url; a.download = `comprobante-${id}.${blob.type === 'application/pdf' ? 'pdf' : blob.type === 'image/png' ? 'png' : 'jpg'}`;
   a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
+export async function downloadPrivateFile(path: string, filename: string) {
+  const response=await fetch(`${API_URL}${path}`,{credentials:'include',headers:bearer?{Authorization:`Bearer ${bearer}`}:{},signal:AbortSignal.timeout(30000)});
+  if(!response.ok){if(response.status===401)window.dispatchEvent(new Event('session-expired'));const data=await response.json().catch(()=>({}));throw new ApiError(data.error||'No se pudo descargar el archivo.',response.status);}
+  const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+}

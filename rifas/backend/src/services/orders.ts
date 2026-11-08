@@ -1,3 +1,4 @@
+import { buyerSnapshot } from './buyer-identity.js';
 import type { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { atomic } from '../db.js';
 import { AppError } from '../errors.js';
@@ -50,7 +51,7 @@ export class OrdersService {
       if (order.userId !== userId) throw new AppError(403, 'No es tu compra.');
       if (order.method === 'TRANSFER' && ['AWAITING_RECEIPT', 'UNDER_REVIEW', 'PAID'].includes(order.status)) return order;
       if (order.status !== 'RESERVED' || order.preferenceId || order.paymentCreatingAt || order.raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta reserva ya no admite cambiar el medio de pago.');
-      return tx.order.update({ where: { id }, data: { method: 'TRANSFER', status: 'AWAITING_RECEIPT', expiresAt: new Date(Date.now() + 24 * 3600000) } });
+      return tx.order.update({ where: { id }, data: { ...await buyerSnapshot(tx, order.userId), method: 'TRANSFER', status: 'AWAITING_RECEIPT', expiresAt: new Date(Date.now() + 24 * 3600000) } });
     });
   }
 }

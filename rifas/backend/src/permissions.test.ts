@@ -9,6 +9,11 @@ const user={id:'user-1',role:'USER',active:true,tokenVersion:0,username:'cliente
 const db={user:{findUnique:vi.fn()},prize:{findMany:vi.fn()},order:{findUnique:vi.fn()}} as unknown as PrismaClient;
 const token=(extra={})=>jwt.sign({sub:user.id,version:0,...extra},cfg.jwtSecret,{issuer:'halcon-airguns',audience:'halcon-web',algorithm:'HS256',expiresIn:'1h'});
 describe('matriz de permisos sin base de datos',()=>{
+  it('permite previsualizar imágenes locales sin habilitar scripts externos', async()=>{
+    const response=await request(createApp(db,cfg)).get('/api/config');
+    expect(response.headers['content-security-policy']).toContain("img-src 'self' data: blob:");
+    expect(response.headers['content-security-policy']).toContain("script-src 'self'");
+  });
   beforeEach(()=>{vi.mocked(db.user.findUnique).mockResolvedValue(user);vi.mocked(db.prize.findMany).mockResolvedValue([]);});
   it.each(['/api/admin/prizes','/api/admin/raffles','/api/admin/users','/api/admin/orders','/api/orders'])('GET %s requiere autenticación',async route=>expect((await request(createApp(db,cfg)).get(route)).status).toBe(401));
   it.each(['/api/admin/prizes','/api/admin/raffles','/api/admin/users','/api/admin/orders'])('GET %s impide acceso de participante',async route=>expect((await request(createApp(db,cfg)).get(route).auth(token(),{type:'bearer'})).status).toBe(403));

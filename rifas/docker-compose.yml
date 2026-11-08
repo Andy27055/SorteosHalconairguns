@@ -29,6 +29,13 @@ services:
       TRANSFER_HOLDER: ${TRANSFER_HOLDER:-}
       TRANSFER_ALIAS: ${TRANSFER_ALIAS:-}
       TRANSFER_CBU: ${TRANSFER_CBU:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       RECEIPT_STORAGE_PATH: /app/data/receipts
     ports:
       - "3001:3001"

@@ -37,3 +37,17 @@ services:
         sync: false
       - key: TRANSFER_CBU
         sync: false
+      - key: SMTP_ENABLED
+        value: "false"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false

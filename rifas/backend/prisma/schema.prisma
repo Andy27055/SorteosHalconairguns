@@ -35,6 +35,8 @@ model User {
   username String @unique
   email String @unique
   fullName String
+  firstName String?
+  lastName String?
   dni String?
   address String?
   passwordHash String
@@ -69,8 +71,14 @@ model Raffle {
 }
 model Order {
   id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId String?
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  guestTokenHash String? @unique
+  guestClientHash String?
+  buyerEmail String?
+  buyerFirstName String?
+  buyerLastName String?
+  buyerDni String?
   raffleId String
   raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Restrict)
   numbers Int[]
@@ -92,8 +100,32 @@ model Order {
   updatedAt DateTime @updatedAt
   allocations Allocation[]
   receipts Receipt[]
+  confirmationEmail PurchaseEmail?
   @@index([status, expiresAt])
   @@index([userId, createdAt])
+  @@index([guestClientHash, status, expiresAt])
+}
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+model PurchaseEmail {
+  id String @id @default(cuid())
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  toEmail String
+  payload Json
+  status EmailStatus @default(PENDING)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lockedAt DateTime?
+  sentAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
 }
 model Allocation {
   id String @id @default(cuid())

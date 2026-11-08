@@ -1,3 +1,4 @@
+import { queuePurchaseEmail } from './purchase-emails.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -50,6 +51,7 @@ export class ReceiptsService {
       if (decision === 'approve' && (!order.receipts.some(r => !r.deletedAt && r.deleteAfter > new Date()) || order.allocations.length !== order.numbers.length)) throw new AppError(409, 'No se puede aprobar sin comprobante vigente y todos los números asignados.');
       if (decision === 'reject') await tx.allocation.deleteMany({ where: { orderId: id } });
       const updated = await tx.order.update({ where: { id }, data: { status: decision === 'approve' ? 'PAID' : 'REJECTED', paidAt: decision === 'approve' ? new Date() : null, decisionNote: note, reviewedBy: actorId } });
+      if (decision === 'approve') await queuePurchaseEmail(tx, id);
       await tx.auditLog.create({ data: { actorId, action: decision === 'approve' ? 'TRANSFER_APPROVED' : 'TRANSFER_REJECTED', entityId: id, detail: { note } } });
       return updated;
     });
