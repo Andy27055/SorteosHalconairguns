@@ -13,6 +13,9 @@ describe('matriz de permisos sin base de datos',()=>{
     const response=await request(createApp(db,cfg)).get('/api/config');
     expect(response.headers['content-security-policy']).toContain("img-src 'self' data: blob:");
     expect(response.headers['content-security-policy']).toContain("script-src 'self'");
+    expect(response.headers['content-security-policy']).toContain("'wasm-unsafe-eval'");
+    expect(response.headers['content-security-policy']).toContain("worker-src 'self'");
+    expect(response.headers['content-security-policy']).not.toContain("'unsafe-eval'");
   });
   beforeEach(()=>{vi.mocked(db.user.findUnique).mockResolvedValue(user);vi.mocked(db.prize.findMany).mockResolvedValue([]);});
   it.each(['/api/admin/prizes','/api/admin/raffles','/api/admin/users','/api/admin/orders','/api/orders'])('GET %s requiere autenticación',async route=>expect((await request(createApp(db,cfg)).get(route)).status).toBe(401));

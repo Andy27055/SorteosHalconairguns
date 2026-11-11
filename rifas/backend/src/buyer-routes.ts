@@ -2,12 +2,15 @@ import { Router } from 'express';
 import type { PrismaClient } from './generated/prisma/client.js';
 import type { AppConfig } from './config.js';
 import { asyncRoute, AppError } from './errors.js';
-import { idSchema } from './schemas.js';
+import { idSchema, buyerRemovalSchema, refundCompletionSchema } from './schemas.js';
 import { BuyersService, buyersWorkbook } from './services/buyers.js';
 import { mailConfigured } from './services/purchase-emails.js';
 export function buyerRouter(db: PrismaClient, cfg: AppConfig) {
   const router = Router(); const service = new BuyersService(db);
   router.get('/raffles/:id/buyers', asyncRoute(async (req, res) => { res.json({ ...await service.list(idSchema.parse(req.params.id)), mailEnabled: mailConfigured(cfg) }); }));
+  router.post('/raffles/:id/buyers/remove',asyncRoute(async(req,res)=>{const input=buyerRemovalSchema.parse(req.body);res.json(await service.remove(req.user!.id,idSchema.parse(req.params.id),input.anchorOrderId,input.version));}));
+  router.get('/raffles/:id/refunds',asyncRoute(async(req,res)=>res.json(await service.pendingRefunds(idSchema.parse(req.params.id)))));
+  router.post('/orders/:id/refund-complete',asyncRoute(async(req,res)=>{const input=refundCompletionSchema.parse(req.body);res.json(await service.completeRefund(req.user!.id,idSchema.parse(req.params.id),input.reference,input.amountCents));}));
   router.get('/raffles/:id/buyers.xlsx', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id); const data = await service.list(id);
     const file = await buyersWorkbook(data.raffle.title, data.buyers);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { addCalendarMonths, receiptMime } from './services/receipts.js';
 import { validWebhook } from './services/payments.js';
-import { registerSchema, reservationSchema, raffleSchema } from './schemas.js';
+import { registerSchema, reservationSchema, raffleSchema, reviewSchema } from './schemas.js';
 describe('conservación de comprobantes', () => {
   it('vence a los tres meses calendario, ajustando el último día', () => expect(addCalendarMonths(new Date('2026-01-31T12:30:00Z'),3).toISOString()).toBe('2026-04-30T12:30:00.000Z'));
   it('respeta febrero de año bisiesto', () => expect(addCalendarMonths(new Date('2023-11-30T12:30:00Z'),3).toISOString()).toBe('2024-02-29T12:30:00.000Z'));
@@ -25,4 +25,9 @@ describe('validaciones del dominio',()=>{
   it.each([[1,1],[0],[1.2],Array.from({length:21},(_,i)=>i+1)])('rechaza selección inválida',numbers=>expect(reservationSchema.safeParse({raffleId:'test',numbers}).success).toBe(false));
   it('acepta selección válida',()=>expect(reservationSchema.parse({raffleId:'test',numbers:[1,100]}).numbers).toEqual([1,100]));
   it('rechaza precios negativos y cantidades fraccionarias',()=>expect(raffleSchema.safeParse({title:'Rifa',prizeId:'p1',ticketPriceCents:-100,totalTickets:1.5}).success).toBe(false));
+});
+
+describe('observación según la decisión del comprobante',()=>{
+  it('permite aprobar sin observación o con un comentario breve',()=>{expect(reviewSchema.parse({decision:'approve'}).note).toBe('');expect(reviewSchema.parse({decision:'approve',note:'  '}).note).toBe('');expect(reviewSchema.parse({decision:'approve',note:'OK'}).note).toBe('OK');});
+  it('exige un motivo válido al rechazar',()=>{for(const note of [undefined,'','   ','No'])expect(reviewSchema.safeParse({decision:'reject',note}).success).toBe(false);expect(reviewSchema.parse({decision:'reject',note:'  Importe incorrecto.  '}).note).toBe('Importe incorrecto.');});
 });

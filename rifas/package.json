@@ -23,7 +23,7 @@
     "concurrently": "^9.2.1"
   },
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.13"
   },
   "overrides": {
     "qs": "^6.16.1",

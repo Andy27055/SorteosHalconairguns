@@ -44,6 +44,7 @@ test('administrador consulta compradores y descarga un Excel por rifa',async({pa
     if(path==='/api/admin/stats')return json(route,{raffles:1,users:1,pendingReviews:0,attention:0,revenueCents:1000000});
     if(path==='/api/admin/raffles')return json(route,[raffle]);if(path==='/api/admin/prizes')return json(route,[raffle.prize]);
     if(path==='/api/admin/users'||path==='/api/admin/audit')return json(route,[]);if(path==='/api/admin/orders')return json(route,{items:[],total:0,page:1});
+    if(path==='/api/admin/raffles/rifa/refunds')return json(route,[]);
     if(path==='/api/admin/raffles/rifa/buyers')return json(route,{raffle,buyers:[{email:user.email,firstName:'Ana',lastName:'Pérez',dni:'01234567',numbers:[11,12],emailStatuses:['PENDING']}],soldNumbers:2,mailEnabled:false});
     if(path==='/api/admin/raffles/rifa/buyers.xlsx')return route.fulfill({status:200,contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',body:Buffer.from('xlsx simulado de interfaz')});
     return json(route,{error:'No previsto'},404);

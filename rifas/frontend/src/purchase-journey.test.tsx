@@ -7,7 +7,7 @@ import { post, downloadPrivateFile } from './api';
 const fixture=vi.hoisted(()=>({reservation:{id:'guest-order',raffleId:'rifa',numbers:[11,12],expiresAt:new Date(Date.now()+600000).toISOString()}}));
 vi.mock('./api',()=>({post:vi.fn(),downloadPrivateFile:vi.fn(),ApiError:class extends Error{fields={};}}));
 vi.mock('./auth',()=>({useAuth:()=>({accept:vi.fn()})}));
-vi.mock('./hooks/useFetch',()=>({useFetch:(url:string)=>({loading:false,error:'',refresh:vi.fn(),data:url==='/guest-reservations'?{reservation:fixture.reservation}:{raffle:{id:'rifa',title:'Rifa test'},buyers:[{email:'ana@example.com',firstName:'Ana',lastName:'Pérez',dni:'01234567',numbers:[11,12],emailStatuses:['PENDING']}],soldNumbers:2,mailEnabled:false}})}));
+vi.mock('./hooks/useFetch',()=>({useFetch:(url:string)=>({loading:false,error:'',refresh:vi.fn(),data:url.endsWith('/refunds')?[]:url==='/guest-reservations'?{reservation:fixture.reservation}:{raffle:{id:'rifa',title:'Rifa test'},buyers:[{email:'ana@example.com',firstName:'Ana',lastName:'Pérez',dni:'01234567',numbers:[11,12],emailStatuses:['PENDING']}],soldNumbers:2,mailEnabled:false}})}));
 describe('continuidad durante autenticación',()=>{
   it('tras ingresar reclama la reserva y abre la misma compra',async()=>{
     vi.mocked(post).mockImplementation(async(url)=>url==='/auth/login'?{user:{id:'user'},token:'test-token'}:{order:{id:'guest-order'}} as never);

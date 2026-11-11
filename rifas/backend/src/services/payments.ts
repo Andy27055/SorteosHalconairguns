@@ -1,5 +1,6 @@
 import { buyerSnapshot } from './buyer-identity.js';
-import { queuePurchaseEmail } from './purchase-emails.js';
+import { queuePurchaseEmail,queueOrderEmail } from './purchase-emails.js';
+import { releaseRefundNumbers } from './refund-state.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { AppConfig } from '../config.js';
@@ -82,15 +83,18 @@ export class PaymentsService {
     return atomic(this.db, async tx => {
       const order = await tx.order.findFirst({ where: { OR: [{ id: payment.external_reference! }, { legacyReference: payment.external_reference! }] } });
       if (!order) return;
+      if((order.refundRequestedAt||order.status==='REFUND_PENDING'||order.status==='REFUNDED')&&(!['refunded','charged_back'].includes(payment.status)||order.method!=='MERCADO_PAGO'||order.paymentId!==String(payment.id))){
+        await tx.auditLog.create({data:{action:'PAYMENT_IGNORED_AFTER_REFUND_REQUEST',entityId:order.id,detail:{paymentId:String(payment.id),status:payment.status}}});return;
+      }
       const markAttention = async (reason: string) => {
         await tx.order.update({ where: { id: order.id }, data: { status: 'NEEDS_ATTENTION', paymentId: String(payment.id), paymentStatus: payment.status, decisionNote: reason } });
         await tx.auditLog.create({ data: { action: 'PAYMENT_NEEDS_ATTENTION', entityId: order.id, detail: { reason, paymentId: String(payment.id) } } });
       };
-      if (order.method !== 'MERCADO_PAGO' || payment.currency_id !== 'ARS' || Math.round(Number(payment.transaction_amount) * 100) !== order.amountCents || (typeof payment.live_mode === 'boolean' && payment.live_mode === this.cfg.mpSandbox)) {
-        await markAttention('El pago no coincide con medio, importe, moneda o entorno de la compra. Requiere conciliación.'); return;
-      }
-      if (order.paymentId && order.paymentId !== String(payment.id) && order.status === 'PAID') {
+      if (order.paymentId && order.paymentId !== String(payment.id) && ['PAID','REFUND_PENDING','REFUNDED'].includes(order.status)) {
         await tx.auditLog.create({ data: { action: 'DUPLICATE_PAYMENT', entityId: order.id, detail: { paymentId: String(payment.id) } } }); return;
+      }
+      if (order.method !== 'MERCADO_PAGO' || payment.currency_id !== 'ARS' || Math.round(Number(payment.transaction_amount) * 100) !== order.amountCents || payment.live_mode !== !this.cfg.mpSandbox) {
+        await markAttention('El pago no coincide con medio, importe, moneda o entorno de la compra. Requiere conciliación.'); return;
       }
       if (payment.status === 'approved') {
         if (order.status === 'PAID' && order.paymentId === String(payment.id)) return;
@@ -101,13 +105,15 @@ export class PaymentsService {
         await tx.order.update({ where: { id: order.id }, data: { status: 'PAID', paidAt: new Date(), paymentId: String(payment.id), paymentStatus: payment.status, decisionNote: null } });
         await queuePurchaseEmail(tx, order.id);
       } else if (['refunded','charged_back'].includes(payment.status)) {
-        // No se revenden números pagados: se conserva la asignación para auditoría/sorteo.
-        await tx.order.update({ where: { id: order.id }, data: { status: 'REFUNDED', paymentId: String(payment.id), paymentStatus: payment.status } });
+        await releaseRefundNumbers(tx,order.id);
+        await tx.order.update({ where: { id: order.id }, data: { status: 'REFUNDED', paymentId: String(payment.id), paymentStatus: payment.status,refundRequestedAt:order.refundRequestedAt||new Date(),refundCompletedAt:order.refundCompletedAt||new Date(),refundAmountCents:order.amountCents,refundReference:`Mercado Pago ${payment.id}`,decisionNote:'El proveedor registró la devolución o contracargo de esta compra.' } });
+        await queueOrderEmail(tx,order.id,'REFUND_COMPLETED');
       } else if (['rejected','cancelled'].includes(payment.status) && order.status === 'PAID') {
         return;
       } else if (['rejected','cancelled'].includes(payment.status)) {
         await tx.allocation.deleteMany({ where: { orderId: order.id } });
         await tx.order.update({ where: { id: order.id }, data: { status: 'REJECTED', paymentId: String(payment.id), paymentStatus: payment.status } });
+        await queueOrderEmail(tx,order.id,'PURCHASE_REJECTED');
       } else {
         await tx.order.update({ where: { id: order.id }, data: { paymentStatus: payment.status } });
       }

@@ -20,7 +20,12 @@ export const raffleSchema = z.object({
   drawAt: z.iso.datetime().nullable().optional(),
 });
 export const reservationSchema = z.object({ raffleId: idSchema, numbers: z.array(z.number().int().min(1).max(10000)).min(1).max(20).refine(a => new Set(a).size === a.length, 'No repitas números.') });
-export const reviewSchema = z.object({ decision: z.enum(['approve', 'reject']), note: text(5, 500) });
+export const rejectionReasonSchema = z.enum(['INCORRECT_AMOUNT','INCORRECT_DETAILS','PAYMENT_NOT_MADE','OTHER']);
+export const reviewSchema = z.object({ decision: z.enum(['approve', 'reject']), note: text(0, 500).default(''), reasonCode: rejectionReasonSchema.optional() }).superRefine((value,ctx)=>{
+  if(value.decision==='reject'&&value.note.length<5)ctx.addIssue({code:'custom',path:['note'],message:'Para rechazar, explicá el motivo con al menos 5 caracteres.'});
+});
+export const buyerRemovalSchema = z.object({anchorOrderId:idSchema,version:z.string().regex(/^[a-f0-9]{64}$/),confirmation:z.literal('CONFIRMAR')});
+export const refundCompletionSchema = z.object({confirmation:z.literal('CONFIRMAR'),reference:text(5,200),amountCents:z.number().int().min(1).max(2000000000)});
 export const roleSchema = z.object({ role: z.enum(['USER', 'ADMIN']), active: z.boolean() });
 export const profileSchema = z.object({ fullName: text(3, 201).optional(), firstName: text(1, 100).optional(), lastName: text(1, 100).optional(), email: registerSchema.shape.email, dni: registerSchema.shape.dni, address: registerSchema.shape.address }).superRefine((value, ctx) => {
   if (!value.fullName && (!value.firstName || !value.lastName)) ctx.addIssue({ code: 'custom', path: ['firstName'], message: 'Completá nombre y apellido.' });

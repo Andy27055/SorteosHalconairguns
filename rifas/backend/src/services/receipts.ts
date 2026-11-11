@@ -1,4 +1,4 @@
-import { queuePurchaseEmail } from './purchase-emails.js';
+import { queuePurchaseEmail,queueOrderEmail } from './purchase-emails.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -43,15 +43,18 @@ export class ReceiptsService {
       });
     } catch (error) { await fs.unlink(path.join(this.directory, key)).catch(() => {}); throw error; }
   }
-  review(actorId: string, id: string, decision: 'approve' | 'reject', note: string) {
+  review(actorId: string, id: string, decision: 'approve' | 'reject', note='', reasonCode='OTHER') {
+    note=note.trim();
+    if(decision==='reject'&&note.length<5)throw new AppError(400,'Para rechazar, explicá el motivo con al menos 5 caracteres.');
     return atomic(this.db, async tx => {
       const order = await tx.order.findUnique({ where: { id }, include: { receipts: true, allocations: true } });
       if (!order) throw new AppError(404, 'Compra no encontrada.');
       if (order.status !== 'UNDER_REVIEW' || order.method !== 'TRANSFER') throw new AppError(409, 'Esta compra no está pendiente de revisión.');
       if (decision === 'approve' && (!order.receipts.some(r => !r.deletedAt && r.deleteAfter > new Date()) || order.allocations.length !== order.numbers.length)) throw new AppError(409, 'No se puede aprobar sin comprobante vigente y todos los números asignados.');
       if (decision === 'reject') await tx.allocation.deleteMany({ where: { orderId: id } });
-      const updated = await tx.order.update({ where: { id }, data: { status: decision === 'approve' ? 'PAID' : 'REJECTED', paidAt: decision === 'approve' ? new Date() : null, decisionNote: note, reviewedBy: actorId } });
+      const updated = await tx.order.update({ where: { id }, data: { status: decision === 'approve' ? 'PAID' : 'REJECTED', paidAt: decision === 'approve' ? new Date() : null, decisionNote: note, reviewedBy: actorId,rejectionReasonCode:decision==='reject'?reasonCode:null,refundRequestedAt:decision==='reject'&&reasonCode==='INCORRECT_AMOUNT'?new Date():null } });
       if (decision === 'approve') await queuePurchaseEmail(tx, id);
+      else await queueOrderEmail(tx,id,'PURCHASE_REJECTED');
       await tx.auditLog.create({ data: { actorId, action: decision === 'approve' ? 'TRANSFER_APPROVED' : 'TRANSFER_REJECTED', entityId: id, detail: { note } } });
       return updated;
     });

@@ -5,6 +5,7 @@ data/db.json
 **/coverage/
 **/src/generated/
 data/receipts/
+**/data/receipts/
 *.log
 .env.*.local
 playwright-artifacts/

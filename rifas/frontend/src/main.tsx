@@ -5,5 +5,7 @@ import './styles.css';
 import './catalog.css';
 import './payments.css';
 import './purchases.css';
+import './receipt-viewer.css';
+import './refunds.css';
 import { App } from './App';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

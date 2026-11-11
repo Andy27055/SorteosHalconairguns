@@ -1,4 +1,5 @@
 import { buyerSnapshot } from './buyer-identity.js';
+import type { TransferAccount } from './transfer-accounts.js';
 import type { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { atomic } from '../db.js';
 import { AppError } from '../errors.js';
@@ -19,7 +20,7 @@ export class OrdersService {
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
       if (raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta rifa no admite reservas.');
       if (numbers.some(n => n > raffle.totalTickets)) throw new AppError(400, 'Hay números fuera del rango de la rifa.');
-      const held = await tx.allocation.count({ where: { order: { userId, status: { not: 'PAID' } } } });
+      const held = await tx.allocation.count({ where: { order: { userId, status: { in: ['RESERVED','PAYMENT_PENDING','AWAITING_RECEIPT','UNDER_REVIEW','NEEDS_ATTENTION'] } } } });
       if (held + numbers.length > 20) throw new AppError(409, 'Podés mantener hasta 20 números pendientes a la vez.');
       if (await tx.allocation.count({ where: { raffleId, number: { in: numbers } } })) throw new AppError(409, 'Uno de esos números acaba de reservarse. Elegí otro.');
       const order = await tx.order.create({ data: {
@@ -43,15 +44,20 @@ export class OrdersService {
       return { ok: true };
     });
   }
-  startTransfer(userId: string, id: string) {
+  startTransfer(userId: string, id: string, account?: TransferAccount) {
     return atomic(this.db, async tx => {
       await expireOrders(tx);
       const order = await tx.order.findUnique({ where: { id }, include: { raffle: true } });
       if (!order) throw new AppError(404, 'Compra no encontrada.');
       if (order.userId !== userId) throw new AppError(403, 'No es tu compra.');
-      if (order.method === 'TRANSFER' && ['AWAITING_RECEIPT', 'UNDER_REVIEW', 'PAID'].includes(order.status)) return order;
+      if (order.method === 'TRANSFER' && ['AWAITING_RECEIPT', 'UNDER_REVIEW', 'PAID'].includes(order.status)) {
+        if (account && order.transferAccountId && account.id !== order.transferAccountId) throw new AppError(409, 'Esta compra ya tiene una cuenta de destino confirmada. Usá los datos que figuran en la compra.');
+        return order;
+      }
       if (order.status !== 'RESERVED' || order.preferenceId || order.paymentCreatingAt || order.raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta reserva ya no admite cambiar el medio de pago.');
-      return tx.order.update({ where: { id }, data: { ...await buyerSnapshot(tx, order.userId), method: 'TRANSFER', status: 'AWAITING_RECEIPT', expiresAt: new Date(Date.now() + 24 * 3600000) } });
+      const updated = await tx.order.update({ where: { id }, data: { ...await buyerSnapshot(tx, order.userId), ...(account ? { transferAccountId: account.id, transferHolder: account.holder, transferAlias: account.alias, transferCbu: account.cbu } : {}), method: 'TRANSFER', status: 'AWAITING_RECEIPT', expiresAt: new Date(Date.now() + 24 * 3600000) } });
+      await tx.auditLog.create({ data: { actorId: userId, action: 'TRANSFER_STARTED', entityId: id, detail: { accountId: account?.id || null } } });
+      return updated;
     });
   }
 }

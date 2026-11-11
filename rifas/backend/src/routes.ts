@@ -1,6 +1,8 @@
 import { guestRouter } from './guest-routes.js';
+import { transferAccounts } from './services/transfer-accounts.js';
 import { buyerRouter } from './buyer-routes.js';
-import { queuePurchaseEmail } from './services/purchase-emails.js';
+import { queuePurchaseEmail,queueOrderEmail } from './services/purchase-emails.js';
+import { releaseRefundNumbers } from './services/refund-state.js';
 import { Router } from 'express';
 import type { PrismaClient } from './generated/prisma/client.js';
 import bcrypt from 'bcryptjs';
@@ -33,7 +35,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.get('/health', asyncRoute(async (_req, res) => { await db.$queryRaw`SELECT 1`; res.json({ status: 'ok' }); }));
   router.get('/config', (_req, res) => res.json({
     mercadoPago: !!(cfg.mpToken && cfg.mpWebhookSecret && cfg.apiUrl.startsWith('https://')),
-    sandbox: cfg.mpSandbox, transfer: !!(cfg.transferHolder && (cfg.transferAlias || cfg.transferCbu)),
+    sandbox: cfg.mpSandbox, transfer: transferAccounts(cfg).length > 0, transferAccounts: transferAccounts(cfg),
     transferAlias: cfg.transferAlias, transferCbu: cfg.transferCbu, transferHolder: cfg.transferHolder,
     receiptMaxMb: 5, receiptRetentionMonths: 3,
   }));
@@ -117,8 +119,12 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     await payments.reconcile(id); res.json({ ok: true });
   }));
   router.post('/orders/:id/transfer', auth, actionLimit, asyncRoute(async (req, res) => {
-    if (!cfg.transferHolder || (!cfg.transferAlias && !cfg.transferCbu)) throw new AppError(503, 'La transferencia todavía no está configurada.');
-    res.json(await orders.startTransfer(req.user!.id, idSchema.parse(req.params.id)));
+    const accounts = transferAccounts(cfg);
+    if (!accounts.length) throw new AppError(503, 'La transferencia todavía no está configurada.');
+    const input = z.object({ accountId: z.enum(['primary', 'secondary']).optional() }).parse(req.body || {});
+    const account = input.accountId ? accounts.find(a => a.id === input.accountId) : accounts[0];
+    if (!account) throw new AppError(400, 'La cuenta seleccionada no está habilitada.');
+    res.json(await orders.startTransfer(req.user!.id, idSchema.parse(req.params.id), account));
   }));
   router.post('/orders/:id/receipt', auth, actionLimit, upload.single('receipt'), asyncRoute(async (req, res) => res.status(201).json(await receipts.upload(req.user!.id, idSchema.parse(req.params.id), req.file))));
   router.get('/receipts/:id', auth, asyncRoute(async (req, res) => {
@@ -197,9 +203,9 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     const status = z.enum(['ALL','UNDER_REVIEW','NEEDS_ATTENTION','PAID','PAYMENT_PENDING','AWAITING_RECEIPT']).default('ALL').parse(req.query.status);
     const page = z.coerce.number().int().min(1).default(1).parse(req.query.page);
     const where = status === 'ALL' ? {} : { status };
-    res.json({ items: await db.order.findMany({ where, include: { ...orderInclude, user: { select: userSelect } }, orderBy: { createdAt: 'desc' }, skip: (page-1)*25, take: 25 }), total: await db.order.count({ where }), page });
+    res.json({ items: await db.order.findMany({ where, include: { ...orderInclude, user: { select: {...userSelect,dni:true,firstName:true,lastName:true} } }, orderBy: { createdAt: 'desc' }, skip: (page-1)*25, take: 25 }), total: await db.order.count({ where }), page });
   }));
-  router.post('/admin/orders/:id/review', asyncRoute(async (req, res) => { const input = reviewSchema.parse(req.body); res.json(await receipts.review(req.user!.id, idSchema.parse(req.params.id), input.decision, input.note)); }));
+  router.post('/admin/orders/:id/review', asyncRoute(async (req, res) => { const input = reviewSchema.parse(req.body); res.json(await receipts.review(req.user!.id, idSchema.parse(req.params.id), input.decision, input.note,input.reasonCode)); }));
   router.post('/admin/orders/:id/resolve', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id);
     const data = z.object({ decision: z.enum(['assign','refund_recorded']), note: z.string().trim().min(10).max(500) }).parse(req.body);
@@ -213,10 +219,11 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
         const missing = order.numbers.filter(n => !existing.some(a => a.number === n));
         if (missing.length) await tx.allocation.createMany({ data: missing.map(number => ({ number, raffleId: order.raffleId, orderId: id })) });
       } else {
-        await tx.allocation.deleteMany({ where: { orderId: id } });
+        await releaseRefundNumbers(tx,id);
       }
-      const result = await tx.order.update({ where: { id }, data: { status: data.decision === 'assign' ? 'PAID' : 'REFUNDED', paidAt: data.decision === 'assign' ? new Date() : order.paidAt, decisionNote: data.note, reviewedBy: req.user!.id } });
+      const result = await tx.order.update({ where: { id }, data: { status: data.decision === 'assign' ? 'PAID' : 'REFUNDED', paidAt: data.decision === 'assign' ? new Date() : order.paidAt, decisionNote: data.note, reviewedBy: req.user!.id,...(data.decision==='refund_recorded'?{refundRequestedAt:order.refundRequestedAt||new Date(),refundCompletedAt:new Date(),refundAmountCents:order.decisionNote?.startsWith('El pago no coincide')?null:order.amountCents,refundReference:data.note}:{}) } });
       if (data.decision === 'assign') await queuePurchaseEmail(tx, id);
+      else await queueOrderEmail(tx,id,'REFUND_COMPLETED');
       await tx.auditLog.create({ data: { actorId: req.user!.id, action: data.decision === 'assign' ? 'PAYMENT_ASSIGNED_MANUALLY' : 'EXTERNAL_REFUND_RECORDED', entityId: id, detail: { note: data.note } } }); return result;
     }));
   }));

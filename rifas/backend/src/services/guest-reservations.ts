@@ -43,7 +43,7 @@ export class GuestReservationsService {
       if (order.userId) throw new AppError(403, 'Esta reserva ya pertenece a otra cuenta.');
       if (order.status !== 'RESERVED' || order.expiresAt <= new Date() || order.allocations.length !== order.numbers.length) throw new AppError(409, 'La reserva temporal venció. Ingresaste correctamente; volvé a la rifa para consultar la disponibilidad.');
       if (order.raffle.status !== 'ACTIVE') throw new AppError(409, 'La rifa ya no admite continuar esta reserva.');
-      const held = await tx.allocation.count({ where: { order: { userId, status: { not: 'PAID' } } } });
+      const held = await tx.allocation.count({ where: { order: { userId, status: { in: ['RESERVED','PAYMENT_PENDING','AWAITING_RECEIPT','UNDER_REVIEW','NEEDS_ATTENTION'] } } } });
       if (held + order.numbers.length > 20) throw new AppError(409, 'Tu cuenta ya tiene reservas pendientes. Revisalas en Mis números para continuar.');
       const updated = await tx.order.update({ where: { id: order.id }, data: { userId, guestClientHash: null, expiresAt: new Date(Date.now() + 5 * 60000) } });
       await tx.auditLog.create({ data: { actorId: userId, action: 'GUEST_RESERVATION_CLAIMED', entityId: order.id } });

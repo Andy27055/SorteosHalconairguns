@@ -24,6 +24,7 @@ enum OrderStatus {
   CANCELLED
   EXPIRED
   NEEDS_ATTENTION
+  REFUND_PENDING
   REFUNDED
 }
 enum PaymentMethod {
@@ -86,6 +87,10 @@ model Order {
   amountCents Int
   status OrderStatus @default(RESERVED)
   method PaymentMethod?
+  transferAccountId String?
+  transferHolder String?
+  transferAlias String?
+  transferCbu String?
   expiresAt DateTime
   preferenceId String? @unique
   checkoutUrl String?
@@ -96,11 +101,16 @@ model Order {
   decisionNote String?
   paidAt DateTime?
   reviewedBy String?
+  rejectionReasonCode String?
+  refundRequestedAt DateTime?
+  refundCompletedAt DateTime?
+  refundAmountCents Int?
+  refundReference String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   allocations Allocation[]
   receipts Receipt[]
-  confirmationEmail PurchaseEmail?
+  emails PurchaseEmail[]
   @@index([status, expiresAt])
   @@index([userId, createdAt])
   @@index([guestClientHash, status, expiresAt])
@@ -112,9 +122,17 @@ enum EmailStatus {
   FAILED
   SKIPPED
 }
+enum OrderEmailKind {
+  PURCHASE_CONFIRMED
+  PURCHASE_REJECTED
+  REFUND_REQUESTED
+  REFUND_COMPLETED
+}
 model PurchaseEmail {
   id String @id @default(cuid())
-  orderId String @unique
+  orderId String
+  eventKey String @unique
+  kind OrderEmailKind @default(PURCHASE_CONFIRMED)
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
   toEmail String
   payload Json
@@ -126,6 +144,7 @@ model PurchaseEmail {
   lastErrorCode String?
   createdAt DateTime @default(now())
   @@index([status, nextAttemptAt])
+  @@index([orderId])
 }
 model Allocation {
   id String @id @default(cuid())

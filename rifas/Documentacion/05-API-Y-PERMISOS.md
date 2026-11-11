@@ -24,7 +24,7 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | Método y ruta | Body / entrada | Acceso | Respuesta / comportamiento de UI |
 |---|---|---|---|
 | GET `/health` | — | P | Estado y conectividad DB; 503/500 si falla |
-| GET `/config` | — | P | Medios habilitados, datos para transferir, retención; nunca tokens |
+| GET `/config` | — | P | Medios habilitados, cuentas `transferAccounts`, datos de transferencia y retención; nunca tokens |
 | POST `/auth/register` | username, email, firstName, lastName, password; dni/address opcionales (fullName legacy admitido) | P | 201 user/token; rol siempre USER; errores por campo |
 | POST `/auth/login` | login (usuario o email), password | P | user/token, cookie; 401 credenciales incorrectas |
 | GET `/auth/me` | — | U/A | user; AuthContext restaura sesión o muestra login |
@@ -45,7 +45,7 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | PUT `/orders/:id/buyer` | email, firstName, lastName, dni | U/A propietario | Completa perfil antes del pago; identidad se copia a la compra al iniciar el medio |
 | DELETE `/orders/:id` | id | U/A propietario | Sólo reserva elegible; no borra historial |
 | POST `/orders/:id/checkout` | — | U/A propietario | `{ checkoutUrl }`; conserva/reutiliza preferencia |
-| POST `/orders/:id/transfer` | — | U/A propietario | Inicia plazo de carga; medio debe estar configurado |
+| POST `/orders/:id/transfer` | accountId opcional: primary/secondary | U/A propietario | Copia el destino a la compra e inicia 24 horas para cargar; medio y cuenta deben estar habilitados |
 | POST `/orders/:id/receipt` | multipart `receipt`, un PDF/JPG/PNG ≤5 MB | U/A propietario | 201 metadatos; estado UNDER_REVIEW |
 | POST `/orders/:id/reconcile` | — | U/A | Consulta MP; A puede hacerlo desde panel |
 | GET `/receipts/:id` | id | U/A | Archivo adjunto privado; otro titular 403; vencido 410 |
@@ -59,6 +59,9 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | GET `/admin/raffles` | — | A | Lista incluyendo borradores |
 | GET `/admin/raffles/:id` | id | A | Detalle administrativo |
 | GET `/admin/raffles/:id/buyers` | id | A | Compradores PAID, datos históricos, números y estado del correo |
+| POST `/admin/raffles/:id/buyers/remove` | anchorOrderId, version, confirmation: CONFIRMAR | A | Baja de las compras mostradas, números libres antes del sorteo y reembolso pendiente |
+| GET `/admin/raffles/:id/refunds` | id de rifa | A | Devoluciones solicitadas sin completar |
+| POST `/admin/orders/:id/refund-complete` | reference, amountCents, confirmation: CONFIRMAR | A | Registra una devolución realizada externamente y genera su aviso |
 | GET `/admin/raffles/:id/buyers.xlsx` | id | A | Excel real con Email, Apellido, Nombre, DNI y Números comprados; descarga auditada |
 | GET `/admin/emails/status` | — | A | Servicio habilitado, pendientes y fallidos |
 | POST `/admin/emails/:id/retry` | id del trabajo | A | Reactiva sólo trabajos FAILED; requiere corregir la causa del fallo |
@@ -67,7 +70,7 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | DELETE `/admin/raffles/:id` | id | A | 409 si hay historial de compras |
 | POST `/admin/raffles/:id/draw` | — | A | Sorteo irreversible, confirmación en modal |
 | GET `/admin/orders` | status opcional, page; 25 por página | A | Compras con titular y metadatos de comprobantes |
-| POST `/admin/orders/:id/review` | decision: approve/reject, note (5..500) | A | Sólo UNDER_REVIEW con TRANSFER; UI pide observación |
+| POST `/admin/orders/:id/review` | decision: approve/reject; note opcional al aprobar, 5..500 al rechazar; reasonCode opcional | A | Sólo UNDER_REVIEW con TRANSFER; motivo editable, aviso al cliente y devolución pendiente para monto incorrecto |
 | POST `/admin/orders/:id/resolve` | decision: assign/refund_recorded, note (10..500) | A | Sólo NEEDS_ATTENTION; no realiza reembolso externo |
 | GET `/admin/users` | — | A | Hasta 500 usuarios, sin hashes ni JWT |
 | GET `/admin/users/:id` | id | A | Usuario sin credenciales |

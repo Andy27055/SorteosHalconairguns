@@ -75,8 +75,8 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('integración PostgreSQL aisl
     const uploaded=await request(app).post(`/api/orders/${orderId}/receipt`).auth(bearer(userId),{type:'bearer'}).attach('receipt',Buffer.from('%PDF-1.7\nhttp-test'),{filename:'test.pdf',contentType:'application/pdf'});expect(uploaded.status).toBe(201);
     expect((await request(app).get(`/api/receipts/${uploaded.body.id}`).auth(bearer(otherId),{type:'bearer'})).status).toBe(403);
     expect((await request(app).get(`/api/receipts/${uploaded.body.id}`).auth(bearer(userId),{type:'bearer'})).status).toBe(200);
-    expect((await request(app).post(`/api/admin/orders/${orderId}/review`).auth(bearer(userId),{type:'bearer'}).send({decision:'approve',note:'No debe permitirse'})).status).toBe(403);
-    expect((await request(app).post(`/api/admin/orders/${orderId}/review`).auth(bearer(admin.id),{type:'bearer'}).send({decision:'approve',note:'Acreditación verificada en prueba.'})).status).toBe(200);
+    expect((await request(app).post(`/api/admin/orders/${orderId}/review`).auth(bearer(userId),{type:'bearer'}).send({decision:'approve'})).status).toBe(403);
+    expect((await request(app).post(`/api/admin/orders/${orderId}/review`).auth(bearer(admin.id),{type:'bearer'}).send({decision:'approve'})).status).toBe(200);
     expect((await db.order.findUniqueOrThrow({where:{id:orderId}})).status).toBe('PAID');
   });
   it('un usuario llamado admin registrado públicamente sigue siendo participante',async()=>{

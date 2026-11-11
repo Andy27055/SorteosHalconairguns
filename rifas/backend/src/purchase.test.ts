@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { buyersWorkbook } from './services/buyers.js';
-import { purchaseMessage, mailConfigured } from './services/purchase-emails.js';
+import { purchaseMessage, notificationMessage, mailConfigured } from './services/purchase-emails.js';
 import { config } from './config.js';
 describe('Excel de compradores',()=>{
   it('genera XLSX real con columnas solicitadas, DNI de texto y números completos',async()=>{
@@ -21,4 +21,6 @@ describe('confirmación de compra por correo',()=>{
   it('incluye rifa, números, total y enlace a la compra',()=>{const mail=purchaseMessage(payload,'https://halcon.example.com');expect(mail.text).toContain('001, 023');expect(mail.text).toContain('Rifa & premio');expect(mail.text).toContain('/compras/order-1');expect(mail.text).toContain('10.000');});
   it('escapa datos de usuarios en el HTML',()=>{const mail=purchaseMessage(payload,'https://halcon.example.com');expect(mail.html).toContain('&lt;script&gt;');expect(mail.html).not.toContain('<script>');});
   it('no habilita envíos sin configuración SMTP explícita',()=>expect(mailConfigured({...config,smtpEnabled:false,smtpHost:'',smtpFrom:''})).toBe(false));
+  it('el rechazo incluye el comentario escapado y el plazo correcto para monto incorrecto',()=>{const mail=notificationMessage('PURCHASE_REJECTED',{...payload,note:'Importe <incorrecto> & recibido',reasonCode:'INCORRECT_AMOUNT'},'https://halcon.example.com');expect(mail.text).toContain('24 a 48 horas');expect(mail.html).toContain('&lt;incorrecto&gt;');expect(mail.html).not.toContain('<incorrecto>');});
+  it('la baja informa gestión en 24 a 72 horas hábiles y no asegura que el dinero ya salió',()=>{const mail=notificationMessage('REFUND_REQUESTED',payload,'https://halcon.example.com');expect(mail.text).toContain('24 a 72 horas hábiles');expect(mail.text).toContain('en gestión');expect(mail.text).not.toContain('ya fue devuelto');});
 });

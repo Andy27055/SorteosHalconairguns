@@ -37,6 +37,12 @@ services:
         sync: false
       - key: TRANSFER_CBU
         sync: false
+      - key: TRANSFER_HOLDER_2
+        sync: false
+      - key: TRANSFER_ALIAS_2
+        sync: false
+      - key: TRANSFER_CBU_2
+        sync: false
       - key: SMTP_ENABLED
         value: "false"
       - key: SMTP_HOST

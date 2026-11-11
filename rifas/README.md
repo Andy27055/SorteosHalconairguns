@@ -2,7 +2,7 @@
 
 React + TypeScript + Vite, Express + JWT, PostgreSQL + Prisma, Mercado Pago Checkout Pro y transferencia con comprobante privado y revisión administrativa. El diseño usa el logo original, negro y dorado, en escritorio y celular.
 
-Actualización 07/11/2026: el cliente entra directamente al catálogo de rifas, también después del login. Una sola rifa tiene una tarjeta destacada; se conserva el listado de varias. Se mejoró el uso desde teléfonos, la selección de números, la vista previa del comprobante y la copia del enlace de pago. Los datos de transferencia y las credenciales de Mercado Pago quedan pendientes hasta que el usuario los reciba: ver [continuidad](Documentacion/08-CONTINUIDAD.md).
+Actualización 07/11/2026: el cliente entra directamente al catálogo de rifas, también después del login. Una sola rifa tiene una tarjeta destacada; se conserva el listado de varias. Se mejoró el uso desde teléfonos, la selección de números, la vista previa del comprobante y la copia del enlace de pago. El 08/11 se configuraron los dos alias entregados para transferencia y se habilitó el circuito de comprobantes; Mercado Pago requiere todavía credenciales de la cuenta vendedora. Ver [pagos y despliegue](Documentacion/10-PAGOS-Y-DESPLIEGUE.md).
 
 ## Estado local
 
@@ -17,7 +17,7 @@ Abrir http://localhost:3011. Para modificar el frontend con recarga automática:
 
 ## Instalación desde cero
 
-Requisitos: Node 22.12 o posterior y Docker Desktop con el motor Linux activo.
+Requisitos: Node 22.13 o posterior y Docker Desktop con el motor Linux activo.
 
 1. Ejecutar `npm ci` desde esta carpeta. Si npm bloquea scripts de dependencias, revisar y autorizar únicamente Prisma, sus motores y esbuild (`npm install-scripts ls`).
 2. Copiar `.env.example` a `.env`, definir una contraseña de PostgreSQL y `JWT_SECRET` aleatorios.
@@ -32,6 +32,8 @@ Requisitos: Node 22.12 o posterior y Docker Desktop con el motor Linux activo.
 ## Reservas, compradores y confirmaciones
 
 Los visitantes pueden apartar números por diez minutos mientras ingresan o se registran; al autenticarse continúan con la misma compra. Antes del pago se confirman email, nombre, apellido y DNI. El administrador dispone de **Administración → Compradores** para consultar ventas confirmadas por rifa y descargar sus datos en un Excel `.xlsx`.
+
+Desde Compradores también puede dar de baja las compras mostradas escribiendo **CONFIRMAR**, liberar los números antes del sorteo y llevar el seguimiento de reembolsos pendientes. El rechazo permite motivos rápidos editables y genera el aviso al cliente; ver [bajas, rechazos y reembolsos](Documentacion/12-BAJAS-RECHAZOS-REEMBOLSOS.md).
 
 Cada pago confirmado deja en cola un correo con lo comprado. **El envío real requiere configurar SMTP y activar `SMTP_ENABLED`; inicialmente está deshabilitado.** Las fallas se reintentan sin alterar la compra. Ver [recorrido, configuración y límites](Documentacion/09-RESERVAS-COMPRADORES-CORREOS.md).
 
@@ -59,7 +61,7 @@ Referencias: [Checkout Pro con Preferences](https://www.mercadopago.com.ar/devel
 
 ## Transferencias y comprobantes
 
-Completar `TRANSFER_HOLDER` y al menos `TRANSFER_ALIAS` o `TRANSFER_CBU` en el backend. Esos datos son públicos para poder transferir; no se debe inventar una cuenta ni habilitar el medio con datos de ejemplo.
+Completar `TRANSFER_HOLDER` y al menos `TRANSFER_ALIAS` o `TRANSFER_CBU` en el backend. Para una segunda cuenta usar `TRANSFER_HOLDER_2` y `TRANSFER_ALIAS_2` o `TRANSFER_CBU_2`. El cliente elige el destino y la compra conserva una copia para su revisión. Esos datos son públicos para poder transferir; no se debe inventar una cuenta ni habilitar el medio con datos de ejemplo.
 
 1. El participante reserva números y elige transferencia.
 2. Tiene 24 horas para subir PDF, JPG o PNG de hasta 5 MB. Se comprueba el contenido básico del archivo, no sólo su extensión.
