@@ -15,11 +15,12 @@ export const loginSchema = z.object({ login: text(1, 254).transform(v => v.toLow
 export const prizeSchema = z.object({ name: text(3, 100), description: text(0, 2000).default('') });
 export const raffleSchema = z.object({
   title: text(3, 100), description: text(0, 3000).default(''), prizeId: idSchema,
-  ticketPriceCents: z.number().int().min(100).max(100000000), totalTickets: z.number().int().min(1).max(10000),
+  ticketPriceCents: z.number().int().min(100).max(100000000), totalTickets: z.number().int().min(1).max(10000).default(100),
+  lotteryDigits:z.number().int().min(1).max(4).nullable().optional(),
   status: z.enum(['DRAFT', 'ACTIVE', 'FINISHED']).default('DRAFT'),
   drawAt: z.iso.datetime().nullable().optional(),
 });
-export const reservationSchema = z.object({ raffleId: idSchema, numbers: z.array(z.number().int().min(1).max(10000)).min(1).max(20).refine(a => new Set(a).size === a.length, 'No repitas números.') });
+export const reservationSchema = z.object({ raffleId: idSchema, numbers: z.array(z.number().int().min(0).max(10000)).min(1).max(20).refine(a => new Set(a).size === a.length, 'No repitas números.') });
 export const rejectionReasonSchema = z.enum(['INCORRECT_AMOUNT','INCORRECT_DETAILS','PAYMENT_NOT_MADE','OTHER']);
 export const reviewSchema = z.object({ decision: z.enum(['approve', 'reject']), note: text(0, 500).default(''), reasonCode: rejectionReasonSchema.optional() }).superRefine((value,ctx)=>{
   if(value.decision==='reject'&&value.note.length<5)ctx.addIssue({code:'custom',path:['note'],message:'Para rechazar, explicá el motivo con al menos 5 caracteres.'});

@@ -1,3 +1,5 @@
+import { recordActivity } from './activity.js';
+import {queueRaffleBuyerEmails} from './raffle-emails.js';
 import { queuePurchaseEmail,queueOrderEmail } from './purchase-emails.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -38,7 +40,7 @@ export class ReceiptsService {
         if (order.status !== 'AWAITING_RECEIPT' || order.method !== 'TRANSFER' || order.expiresAt < uploadedAt) throw new AppError(409, 'La compra no admite comprobantes o el plazo venció.');
         const receipt = await tx.receipt.create({ data: { orderId, storageKey: key, mimeType, size: file.size, sha256: createHash('sha256').update(file.buffer).digest('hex'), uploadedAt, deleteAfter } });
         await tx.order.update({ where: { id: orderId }, data: { status: 'UNDER_REVIEW' } });
-        await tx.auditLog.create({ data: { actorId: userId, action: 'RECEIPT_UPLOADED', entityId: orderId, detail: { receiptId: receipt.id, deleteAfter: deleteAfter.toISOString() } } });
+        await recordActivity(tx,{ data: { actorId: userId, action: 'RECEIPT_UPLOADED', entityId: orderId, detail: { receiptId: receipt.id, deleteAfter: deleteAfter.toISOString() } } });
         return { id: receipt.id, uploadedAt, deleteAfter };
       });
     } catch (error) { await fs.unlink(path.join(this.directory, key)).catch(() => {}); throw error; }
@@ -47,15 +49,16 @@ export class ReceiptsService {
     note=note.trim();
     if(decision==='reject'&&note.length<5)throw new AppError(400,'Para rechazar, explicá el motivo con al menos 5 caracteres.');
     return atomic(this.db, async tx => {
-      const order = await tx.order.findUnique({ where: { id }, include: { receipts: true, allocations: true } });
+      const order = await tx.order.findUnique({ where: { id }, include: { receipts: true, allocations: true,raffle:true } });
       if (!order) throw new AppError(404, 'Compra no encontrada.');
       if (order.status !== 'UNDER_REVIEW' || order.method !== 'TRANSFER') throw new AppError(409, 'Esta compra no está pendiente de revisión.');
+      if(decision==='approve'&&['CANCELLED','FINISHED'].includes(order.raffle.status))throw new AppError(409,'La rifa ya fue cancelada o tiene un resultado confirmado. Revisá la devolución del pago.');
       if (decision === 'approve' && (!order.receipts.some(r => !r.deletedAt && r.deleteAfter > new Date()) || order.allocations.length !== order.numbers.length)) throw new AppError(409, 'No se puede aprobar sin comprobante vigente y todos los números asignados.');
       if (decision === 'reject') await tx.allocation.deleteMany({ where: { orderId: id } });
       const updated = await tx.order.update({ where: { id }, data: { status: decision === 'approve' ? 'PAID' : 'REJECTED', paidAt: decision === 'approve' ? new Date() : null, decisionNote: note, reviewedBy: actorId,rejectionReasonCode:decision==='reject'?reasonCode:null,refundRequestedAt:decision==='reject'&&reasonCode==='INCORRECT_AMOUNT'?new Date():null } });
-      if (decision === 'approve') await queuePurchaseEmail(tx, id);
+      if (decision === 'approve') {await queuePurchaseEmail(tx, id);if(order.raffle.closedEarly&&order.raffle.status==='CLOSING')await queueRaffleBuyerEmails(tx,order.raffleId,'RAFFLE_EARLY_CLOSURE');}
       else await queueOrderEmail(tx,id,'PURCHASE_REJECTED');
-      await tx.auditLog.create({ data: { actorId, action: decision === 'approve' ? 'TRANSFER_APPROVED' : 'TRANSFER_REJECTED', entityId: id, detail: { note } } });
+      await recordActivity(tx,{ data: { actorId, action: decision === 'approve' ? 'TRANSFER_APPROVED' : 'TRANSFER_REJECTED', entityId: id, detail: { note } } });
       return updated;
     });
   }
@@ -68,7 +71,7 @@ export class ReceiptsService {
       try { await fs.unlink(path.join(this.directory, receipt.storageKey)); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
       await this.db.receipt.updateMany({ where: { id: receipt.id, deletedAt: null }, data: { deletedAt: now } });
-      await this.db.auditLog.create({ data: { action: 'RECEIPT_FILE_PURGED', entityId: receipt.orderId, detail: { receiptId: receipt.id } } });
+      await recordActivity(this.db,{ data: { action: 'RECEIPT_FILE_PURGED', entityId: receipt.orderId, detail: { receiptId: receipt.id } } });
       removed++;
     }
     // Recupera archivos huérfanos de caídas entre filesystem y commit; nunca se borra fuera de esta carpeta.

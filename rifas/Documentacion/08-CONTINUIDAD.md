@@ -52,9 +52,9 @@ El usuario confirmó que se agrega al comprador al aprobar el pago. Se incorpora
 
 Corrección posterior del usuario: la observación debe ser opcional para aprobar un comprobante y obligatoria únicamente para rechazar. La interfaz, la API y el servicio de revisión aplican esta regla; el rechazo conserva el mínimo de cinco caracteres.
 
-## Pendiente: finalización por lotería — pausa del usuario, 08/11/2026
+## Historial: finalización por lotería — pausa del usuario, 08/11/2026 (retomada el 12/11)
 
-El usuario pidió esperar hasta obtener la información faltante y apagar los servicios. **No continuar modificando la finalización ni la numeración hasta que retome este trabajo.** En esta etapa sólo se investigaron fuentes y se leyeron archivos; no se sustituyó el mecanismo de sorteo ni se migraron números.
+El usuario pidió esperar hasta obtener la información faltante y apagar los servicios. Esta pausa terminó el 12/11, al confirmar Provincia, Nocturna, primer premio y últimas dos cifras. El siguiente registro describe el estado histórico anterior; ver la revisión actual al final.
 
 Decisiones ya indicadas para cuando se retome:
 
@@ -67,3 +67,48 @@ Decisiones ya indicadas para cuando se retome:
 La investigación preliminar encontró resultados en el sitio oficial de LOTBA: `https://quiniela.loteriadelaciudad.gob.ar/?page=home`. Su página carga `includes/resultados-data.php?sorteo=NUMERO`, con fecha, modalidad, jurisdicciones, posiciones y enlaces al extracto. Se verificó el formato mediante lectura, sin ejecutar el código remoto ni finalizar rifas. Es una fuente del sitio web, no se verificó un contrato de API pública estable. Revisar la fuente que corresponda cuando el usuario confirme el juego.
 
 El trabajo anterior quedó guardado localmente: pagos, comprobantes, compradores, bajas, avisos y aprobación con observación opcional. La base tiene seis migraciones aplicadas; SMTP y credenciales de Mercado Pago continúan pendientes. Para retomar la aplicación: iniciar Docker Desktop, ejecutar `docker compose -p halcon-airguns up -d db` y luego `npm start` desde `Halcon airguns rifas/rifas`; URL local `http://localhost:3011`.
+
+
+## Reanudación del 12/11/2026
+
+Se crearon las tres cuentas ADMIN solicitadas. Credenciales nuevas en backend/.admin-accounts.local.json (ignorado). Sólo Andy tiene confirmación de correo preparada: SMTP aún sin usuario, clave ni remitente. El usuario pidió configurarlo ahora y recibió instrucciones para backend/.env, líneas 28–34; no imprimir secretos. Comando de prueba exclusivo para Andy: npm.cmd run mail:test -w backend.
+
+Se reemplazó el sorteo aleatorio por Finalizar rifa, con Provincia Nocturna a la cabeza, fecha verificada, evidencia y correo al ganador en cola. Portada con último ganador y enlace diario que desaparece a medianoche argentina. Las nuevas rifas parten de 00; la cantidad sigue editable. Las dos rifas anteriores conservan su numeración por tener compras. Cierre de fechas pasadas y política de número no vendido quedan pendientes, sin elegir otro ganador.
+
+Actividad administrativa con texto legible y rol al momento del evento; historial privado en perfil propio y consulta administrativa desde Participantes. Migración 7 aplicada. Ver [guía actual, pruebas y límites](13-LOTERIA-CUENTAS-ACTIVIDAD.md).
+
+La app local se ejecuta con npm.cmd run dev (web http://localhost:5173 y API http://localhost:3011); Docker DB activo. Configuración SMTP pendiente de respuesta del usuario; Mercado Pago continúa sin credenciales. Sin despliegue ni correos reales enviados durante esta revisión.
+
+
+### SMTP configurado y prueba real aceptada (12/11/2026, 14:51 Argentina)
+
+El usuario completó backend/.env. Se habilitó SMTP_ENABLED y se quitaron los espacios de separación de la clave de aplicación de Gmail. No imprimir secretos. El comando mail:test autenticó SMTP y envió exclusivamente la confirmación a Andy; Gmail aceptó el mensaje y el registro quedó SENT. El destinatario aún debe abrir y confirmar el enlace; no marcar emailVerifiedAt manualmente. Web localhost:5173 y API localhost:3011 disponibles.
+
+No se reinició el proceso general de correos: conserva su configuración anterior deshabilitada. Hay 8 avisos antiguos de compras pendientes, 6 vinculados a demostraciones. No enviarlos como parte de otra prueba de verificación. Revisar su destino antes de activar el trabajador general. El archivo de entorno ya tiene SMTP habilitado para próximos reinicios.
+
+
+### Cuenta principal y avisos de spam (12/11/2026)
+
+Se reemplazó la identidad personal por halconairguns@gmail.com, usuario halcon-dev, tipo PRIMARY. Se conservó su contraseña elegida por el usuario (archivo privado local), se revocaron sesiones y enlaces viejos y se retiró el correo/usuario personal anterior como acceso. No recrear la cuenta personal. Osvaldo y José son FUNCTIONAL con sus contraseñas conservadas. Sólo PRIMARY gestiona permisos de administradores. Se encoló verificación para la nueva dirección; no se envió otro correo en esta revisión. mail:test ya apunta al correo principal.
+
+Aviso de spam incorporado en registro, perfil, verificación sin enlace y estados de compra con avisos por correo. Migración 8 aplicada. Builds correctos, 57 pruebas de backend, 45 de frontend, 66 con PostgreSQL y 12 de navegador correctas.
+
+Aplicación local iniciada con SMTP_ENABLED=false sólo en el proceso para no disparar los 8 avisos antiguos; backend/.env mantiene SMTP configurado y habilitado. La cuenta de demostración heredada admin@halcon.local conserva sus compras y quedó funcional. Ver [estado actual y permisos](14-ADMINISTRACION-PRINCIPAL-Y-SPAM.md).
+
+
+### Cancelaciones y cierres automáticos (12/11/2026)
+
+Todos los administradores pueden solicitar cierre y eliminar/cancelar rifas en cualquier estado comercial. Eliminar usa cancelación lógica, motivo opcional, Excel antes de confirmar, copia privada del listado y devoluciones pendientes para compras pagadas. Aviso de cancelación por correo sin duplicar destinatarios. La copia de compradores se omite en endpoints públicos y también en compras del titular.
+
+Cierre anticipado fija la Nocturna del día y avisa a compradores; el cierre con fecha prevista lo solicita una tarea cada minuto y al iniciar. Resultado pendiente usa CLOSING, no vende más y espera publicación/revisión. Se agregó recuperación histórica oficial por fecha con PDF.js y caché durable LotteryDraw. Ganador y todos los admins reciben avisos al confirmarse. No se define regla alternativa para número no vendido.
+
+Migración 9 aplicada. Builds y pruebas correctos: 63 backend, 45 frontend, 82 PostgreSQL, 17 navegador. Ver [guía vigente](15-CANCELACION-Y-CIERRE-AUTOMATICO.md).
+
+Importante para continuidad: ahora SMTP está habilitado en el proceso local, además del archivo .env. Los 8 avisos antiguos de pruebas se revisaron y marcaron SKIPPED (LEGACY_DEMO_NOTIFICATION); sus datos siguen guardados. Se preservó el aviso nuevo a la cuenta principal y Gmail aceptó su confirmación de compra y verificación. No volver a encolar los avisos antiguos. npm run dev activo en web 5173 / API 3011. La rifa vieja de 1.000 números pasó a CLOSING por fecha vencida y queda pendiente de regla de cifras; no tiene ganador.
+
+
+### Cierre de sesión solicitado por el usuario (12/11/2026)
+
+Todos los cambios quedaron guardados en disco; no se realizó commit, push ni despliegue. Se detuvo npm run dev (web y API) y se detuvieron los contenedores del proyecto halcon-airguns, conservando la base de datos y los volúmenes.
+
+Para retomar: iniciar Docker Desktop si hace falta, ejecutar docker compose -p halcon-airguns up -d db y npm.cmd run dev desde rifas. Web http://localhost:5173, API http://localhost:3011. SMTP real está habilitado y los cierres programados se retoman al iniciar. No reencolar los ocho avisos de demostración omitidos. La rifa heredada de 1.000 números sigue con ventas cerradas y pendiente de regla de cifras.

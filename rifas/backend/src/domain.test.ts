@@ -22,8 +22,8 @@ describe('validaciones del dominio',()=>{
   it('registro público descarta rol enviado por el cliente',()=>expect(registerSchema.parse({...data,role:'ADMIN'})).not.toHaveProperty('role'));
   it('rechaza nombres que contengan HTML',()=>expect(registerSchema.safeParse({...data,username:'<img src=x>'}).success).toBe(false));
   it('rechaza DNI con puntos y nombres vacíos',()=>{expect(registerSchema.safeParse({...data,dni:'12.345.678'}).success).toBe(false);expect(registerSchema.safeParse({...data,fullName:'   '}).success).toBe(false);});
-  it.each([[1,1],[0],[1.2],Array.from({length:21},(_,i)=>i+1)])('rechaza selección inválida',numbers=>expect(reservationSchema.safeParse({raffleId:'test',numbers}).success).toBe(false));
-  it('acepta selección válida',()=>expect(reservationSchema.parse({raffleId:'test',numbers:[1,100]}).numbers).toEqual([1,100]));
+  it.each([{numbers:[1,1]},{numbers:[-1]},{numbers:[1.2]},{numbers:Array.from({length:21},(_,i)=>i+1)}])('rechaza selección inválida',({numbers})=>expect(reservationSchema.safeParse({raffleId:'test',numbers}).success).toBe(false));
+  it('acepta selección válida',()=>expect(reservationSchema.parse({raffleId:'test',numbers:[0,99]}).numbers).toEqual([0,99]));
   it('rechaza precios negativos y cantidades fraccionarias',()=>expect(raffleSchema.safeParse({title:'Rifa',prizeId:'p1',ticketPriceCents:-100,totalTickets:1.5}).success).toBe(false));
 });
 

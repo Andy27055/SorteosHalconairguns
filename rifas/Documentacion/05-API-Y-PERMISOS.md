@@ -68,7 +68,8 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | POST `/admin/raffles` | title, description, prizeId, ticketPriceCents, totalTickets, status, drawAt | A | 201; crear DRAFT o ACTIVE |
 | PUT `/admin/raffles/:id` | mismos campos | A | Validación de asignados, pendientes y resultado |
 | DELETE `/admin/raffles/:id` | id | A | 409 si hay historial de compras |
-| POST `/admin/raffles/:id/draw` | — | A | Sorteo irreversible, confirmación en modal |
+| POST `/admin/raffles/:id/finish` | id | A | Verifica Provincia Nocturna de fecha prevista, registra ganador y encola aviso |
+| POST `/admin/raffles/:id/draw` | id | A | Retirado: devuelve 410 |
 | GET `/admin/orders` | status opcional, page; 25 por página | A | Compras con titular y metadatos de comprobantes |
 | POST `/admin/orders/:id/review` | decision: approve/reject; note opcional al aprobar, 5..500 al rechazar; reasonCode opcional | A | Sólo UNDER_REVIEW con TRANSFER; motivo editable, aviso al cliente y devolución pendiente para monto incorrecto |
 | POST `/admin/orders/:id/resolve` | decision: assign/refund_recorded, note (10..500) | A | Sólo NEEDS_ATTENTION; no realiza reembolso externo |
@@ -77,12 +78,12 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | POST `/admin/users` | mismos datos de registro | A | 201 USER; posterior cambio de rol es separado |
 | PUT `/admin/users/:id` | role: USER/ADMIN, active | A | Invalida sesiones; no quita propio/último administrador |
 | DELETE `/admin/users/:id` | id | A | Baja lógica; conserva compras y auditoría |
-| GET `/admin/audit` | — | A | Últimas 100 acciones |
+| GET `/admin/audit` | page | A | Acciones administrativas legibles, 50 por página, {items,page,total} |
 | POST `/admin/receipts/purge` | — | A | Elimina sólo archivos vencidos |
 
 ## Ejemplos y unidades
 
-Precio: `ticketPriceCents: 500000` significa ARS 5.000,00. Fechas ISO 8601; el frontend presenta fechas en Argentina. Números enteros de 1 a totalTickets; ceros a la izquierda son presentación, no otra identidad.
+Precio: `ticketPriceCents: 500000` significa ARS 5.000,00. Fechas ISO 8601; el frontend presenta fechas en Argentina. En nuevas rifas, números enteros de 0 a totalTickets-1 (00–99 para 100). Las rifas previas conservan numberStart=1 para respetar sus compras; consultar numberStart en la API.
 
 ```json
 {"raffleId":"demo-rifa","numbers":[1,23,45]}
@@ -92,4 +93,33 @@ Precio: `ticketPriceCents: 500000` significa ARS 5.000,00. Fechas ISO 8601; el f
 {"decision":"approve","note":"Acreditación verificada en la cuenta de destino."}
 ```
 
-`api.http` incluye pedidos de prueba. Para calificar permisos ejecutar las pruebas HTTP sin DB y la suite PostgreSQL; no alcanza con ocultar botones. El listado de usuarios tiene límite de 500 sin paginado y la consulta de auditoría muestra las últimas 100 acciones: para mayor escala se debe ampliar la navegación, no asumir que es un archivo histórico exportable.
+`api.http` incluye pedidos de prueba. Para calificar permisos ejecutar las pruebas HTTP sin DB y la suite PostgreSQL; no alcanza con ocultar botones. El listado de usuarios tiene límite de 500 sin paginado y la consulta de auditoría ahora pagina 50 acciones administrativas: para mayor escala se debe ampliar la navegación, no asumir que es un archivo histórico exportable.
+
+
+### Verificación e historial (12/11/2026)
+
+- POST /auth/verify-email: token firmado y password opcional; público con límite de intentos, token personal de un uso.
+- POST /profile/verification: titular autenticado; encola enlace al email actual.
+- GET /profile/activity?page=1: historial exclusivo del titular.
+- GET /admin/users/:id/activity?page=1: sólo ADMIN.
+- GET /admin/users/:id: incluye perfil sin credenciales, sólo ADMIN.
+- La información pública de rifa omite winnerOrderId y el fragmento HTML de evidencia. El enlace diario oficial sólo se incluye el día del resultado en Argentina.
+
+Detalles y límites: [Lotería, cuentas y actividad](13-LOTERIA-CUENTAS-ACTIVIDAD.md).
+
+
+### Tipos de administrador (12/11/2026)
+
+Las respuestas de usuario incluyen adminType: PRIMARY, FUNCTIONAL o null. En PUT /admin/users/:id, sólo PRIMARY puede promover a ADMIN o modificar el acceso de otro ADMIN. Las promociones crean administradores FUNCTIONAL; adminType no se toma del payload. DELETE /admin/users/:id permite a FUNCTIONAL desactivar clientes, pero sólo PRIMARY puede desactivar administradores funcionales. La cuenta PRIMARY no puede degradarse ni desactivarse. Ver [matriz actual](14-ADMINISTRACION-PRINCIPAL-Y-SPAM.md).
+
+
+### Ciclo de rifas revisado (12/11/2026)
+
+- DELETE /admin/raffles/:id acepta reason opcional (0–1000 caracteres). Ambos tipos de ADMIN pueden cancelar aun con compradores o resultado previo. Cancelación lógica, copia privada de compradores, avisos y reembolsos pendientes.
+- GET /admin/raffles/:id/buyers.xlsx conserva el listado al cancelar y sirve para descargarlo antes de la acción.
+- POST /admin/raffles/:id/finish permite cierre anticipado y devuelve CLOSING si falta publicar/verificar el resultado o resolver pagos. En FINISHED devuelve el mismo resultado; no repite sorteo.
+- Rifas con fecha prevista se cierran automáticamente al vencer; los resultados y avisos se reintentan mientras el servicio está activo.
+- GET /raffles omite canceladas; GET /raffles/:id informa su cancelación sin datos de otros compradores.
+- GET /admin/emails/status y POST /admin/emails/:id/retry abarcan avisos de compras, rifas y verificación.
+
+Ver [reglas vigentes y fuente histórica](15-CANCELACION-Y-CIERRE-AUTOMATICO.md).

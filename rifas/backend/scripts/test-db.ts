@@ -1,5 +1,5 @@
 import '../src/config.js';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-const result=spawnSync(process.execPath,[path.resolve('../node_modules/vitest/vitest.mjs'),'run','src/integration.test.ts','src/purchase-flow.test.ts','src/refund-flow.test.ts'],{stdio:'inherit',env:{...process.env,RUN_DB_TESTS:'true'}});
+const result=spawnSync(process.execPath,[path.resolve('../node_modules/vitest/vitest.mjs'),'run','src/integration.test.ts','src/purchase-flow.test.ts','src/refund-flow.test.ts','src/lottery-identity-flow.test.ts','src/raffle-lifecycle-flow.test.ts'],{stdio:'inherit',env:{...process.env,RUN_DB_TESTS:'true'}});
 process.exit(result.status??1);

@@ -4,7 +4,8 @@ import jwt from 'jsonwebtoken';
 import type { AppConfig } from './config.js';
 import { AppError, asyncRoute } from './errors.js';
 declare global { namespace Express { interface Request { user?: User } } }
-export const publicUser = (u: User) => ({ id: u.id, username: u.username, email: u.email, fullName: u.fullName, firstName: u.firstName, lastName: u.lastName, role: u.role });
+export const publicUser = (u: User) => ({ id: u.id, username: u.username, email: u.email, fullName: u.fullName, firstName: u.firstName, lastName: u.lastName, role: u.role, adminType:u.role==='ADMIN'?(u.adminType||'FUNCTIONAL'):null, emailVerifiedAt:u.emailVerifiedAt });
+export const isPrimaryAdmin=(user:Pick<User,'role'|'adminType'>)=>user.role==='ADMIN'&&user.adminType==='PRIMARY';
 export const cookieOptions = (cfg: AppConfig) => ({ httpOnly: true, secure: cfg.production, sameSite: 'lax' as const, path: '/api', maxAge: cfg.jwtHours * 3600000 });
 export function issueToken(user: User, res: Response, cfg: AppConfig) {
   const token = jwt.sign({ sub: user.id, version: user.tokenVersion }, cfg.jwtSecret, { expiresIn: `${cfg.jwtHours}h`, issuer: 'halcon-airguns', audience: 'halcon-web', algorithm: 'HS256' });

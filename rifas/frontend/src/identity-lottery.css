@@ -1,0 +1,8 @@
+.winner-announcement{margin:24px 0;border-color:var(--gold);overflow-wrap:anywhere;background:radial-gradient(ellipse at top right,#cda34b18,transparent 70%),var(--panel,#171611)}
+.winner-announcement .winner-number{display:block;font:600 clamp(50px,12vw,90px) var(--heading);color:var(--gold);line-height:1.2}
+.winner-announcement p{line-height:1.7}.winner-announcement .btn{white-space:normal;min-height:44px}
+.activity-panel{margin:32px 0}.activity-panel .audit-list article{display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.activity-panel .audit-list article>div{min-width:0}.activity-panel .audit-list article p{margin:4px 0}.activity-panel .audit-list article small{color:var(--muted);flex-shrink:0}
+@media(max-width:600px){.activity-panel .audit-list article{flex-direction:column;gap:8px}.winner-announcement{padding:20px}.winner-announcement .btn{width:100%}}
+
+.raffle-lifecycle-modal .modal-body,.raffle-state-notice{overflow-wrap:anywhere}.raffle-lifecycle-modal .modal-body .btn{max-width:100%;white-space:normal;min-height:44px}

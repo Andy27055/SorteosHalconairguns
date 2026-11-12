@@ -115,7 +115,7 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('reservas visitantes, comprad
     expect((await request(app).get(`/api/admin/raffles/${raffleId}/buyers`)).status).toBe(401);
     expect((await request(app).get(`/api/admin/raffles/${raffleId}/buyers.xlsx`).auth(token(userId),{type:'bearer'})).status).toBe(403);
     const response=await request(app).get(`/api/admin/raffles/${raffleId}/buyers.xlsx`).auth(token(adminId),{type:'bearer'}).buffer(true).parse((res,callback)=>{const chunks:Buffer[]=[];res.on('data',(c:Buffer)=>chunks.push(c));res.on('end',()=>callback(null,Buffer.concat(chunks)));});
-    expect(response.status).toBe(200);expect(response.headers['content-type']).toContain('spreadsheetml');const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);expect(book.worksheets[0].getCell('D2').value).toBe('01234567');expect(book.worksheets[0].getCell('E2').value).toBe('060, 061, 063');
+    expect(response.status).toBe(200);expect(response.headers['content-type']).toContain('spreadsheetml');const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);expect(book.worksheets[0].getCell('D2').value).toBe('01234567');expect(book.worksheets[0].getCell('E2').value).toBe('60, 61, 63');
   });
   it('sin SMTP no marca correos como enviados',async()=>{expect((await new PurchaseEmailWorker(db,cfg,{sendMail:async()=>{throw new Error('No debe enviar');}}).process()).enabled).toBe(false);expect((await db.purchaseEmail.findFirstOrThrow({where:{orderId:paidId}})).status).toBe('PENDING');});
   it('dos trabajadores no duplican los correos y usan la dirección guardada al comprar',async()=>{
@@ -123,7 +123,7 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('reservas visitantes, comprad
     const messages:{to:string;text:string;messageId:string}[]=[];const sender={sendMail:async(message:{to:string;text:string;messageId:string})=>{messages.push(message);}};
     const mailCfg={...cfg,smtpEnabled:true,smtpHost:'smtp.test.invalid',smtpFrom:'compras@example.com'};
     await Promise.all([new PurchaseEmailWorker(db,mailCfg,sender).process(),new PurchaseEmailWorker(db,mailCfg,sender).process()]);
-    expect(messages).toHaveLength(pending);expect(new Set(messages.map(m=>m.messageId)).size).toBe(pending);expect(messages.every(m=>m.to==='ana@example.com')).toBe(true);expect(messages.some(m=>m.text.includes('060, 061'))).toBe(true);expect((await db.purchaseEmail.findFirstOrThrow({where:{orderId:paidId}})).status).toBe('SENT');
+    expect(messages).toHaveLength(pending);expect(new Set(messages.map(m=>m.messageId)).size).toBe(pending);expect(messages.every(m=>m.to==='ana@example.com')).toBe(true);expect(messages.some(m=>m.text.includes('60, 61'))).toBe(true);expect((await db.purchaseEmail.findFirstOrThrow({where:{orderId:paidId}})).status).toBe('SENT');
   });
   it('un fallo SMTP conserva la compra y permite reintentar el mensaje',async()=>{
     const r=await orders.reserve(userId,raffleId,[64]);await payments.checkout(userId,r.id);await payments.apply({id:'payment-retry',status:'approved',external_reference:r.id,transaction_amount:r.amountCents/100,currency_id:'ARS',live_mode:false});

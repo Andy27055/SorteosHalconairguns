@@ -1,3 +1,4 @@
+import { recordActivity } from './activity.js';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
 import type { PrismaClient, Prisma } from '../generated/prisma/client.js';
@@ -19,12 +20,12 @@ function groupBuyers(orders:BuyerRecord[]){
   }
   return [...grouped.values()].map(b=>({...b,version:createHash('sha256').update(JSON.stringify([b.email,b.firstName,b.lastName,b.dni,b.orders])).digest('hex')})).sort((a,b)=>a.lastName.localeCompare(b.lastName,'es')||a.firstName.localeCompare(b.firstName,'es'));
 }
+export async function paidBuyers(tx:Pick<Prisma.TransactionClient,'order'>,raffleId:string){return groupBuyers(await tx.order.findMany({where:{raffleId,status:'PAID',userId:{not:null}},include:buyerInclude,orderBy:[{paidAt:'asc'},{id:'asc'}]}));}
 export class BuyersService {
   constructor(private db: PrismaClient) {}
   async list(raffleId: string) {
-    const raffle = await this.db.raffle.findUniqueOrThrow({ where: { id: raffleId }, select: { id: true, title: true } });
-    const orders = await this.db.order.findMany({ where: { raffleId, status: 'PAID', userId: { not: null } }, include:buyerInclude, orderBy: [{ paidAt: 'asc' }, { id: 'asc' }] });
-    const buyers=groupBuyers(orders);
+    const {cancellationBuyers,...raffle} = await this.db.raffle.findUniqueOrThrow({ where: { id: raffleId }, select: { id: true, title: true,totalTickets:true,numberStart:true,status:true,cancellationBuyers:true } });
+    const buyers=raffle.status==='CANCELLED'&&Array.isArray(cancellationBuyers)?cancellationBuyers as unknown as Buyer[]:await paidBuyers(this.db,raffleId);
     return { raffle, buyers, soldNumbers: buyers.reduce((sum,b) => sum+b.numbers.length,0) };
   }
   async remove(actorId:string,raffleId:string,anchorOrderId:string,version:string){
@@ -41,7 +42,7 @@ export class BuyersService {
         await tx.purchaseEmail.updateMany({where:{orderId:order.id,kind:'PURCHASE_CONFIRMED',status:{in:['PENDING','FAILED']}},data:{status:'SKIPPED',lastErrorCode:'ORDER_REMOVED'}});
         await queueOrderEmail(tx,order.id,'REFUND_REQUESTED');
       }
-      await tx.auditLog.create({data:{actorId,action:'BUYER_REMOVED_REFUND_REQUESTED',entityId:raffleId,detail:{orderIds:buyer.orders.map(o=>o.id),numbers:buyer.numbers,amountCents:buyer.amountCents}}});
+      await recordActivity(tx,{data:{actorId,action:'BUYER_REMOVED_REFUND_REQUESTED',entityId:raffleId,detail:{orderIds:buyer.orders.map(o=>o.id),numbers:buyer.numbers,amountCents:buyer.amountCents}}});
       return{ok:true,orders:buyer.orders.length};
     });
   }
@@ -57,11 +58,11 @@ export class BuyersService {
       await releaseRefundNumbers(tx,orderId);
       await tx.order.update({where:{id:orderId},data:{status:'REFUNDED',refundCompletedAt:new Date(),refundReference:reference,refundAmountCents:amountCents,reviewedBy:actorId,decisionNote:`Reembolso realizado. Referencia: ${reference}.`}});
       await queueOrderEmail(tx,orderId,'REFUND_COMPLETED');
-      await tx.auditLog.create({data:{actorId,action:'REFUND_COMPLETED_MANUALLY',entityId:orderId,detail:{reference,amountCents}}});return{ok:true};
+      await recordActivity(tx,{data:{actorId,action:'REFUND_COMPLETED_MANUALLY',entityId:orderId,detail:{reference,amountCents}}});return{ok:true};
     });
   }
 }
-export async function buyersWorkbook(title: string, buyers: Buyer[]) {
+export async function buyersWorkbook(title: string, buyers: Buyer[],digits=3) {
   const workbook = new ExcelJS.Workbook(); workbook.creator = 'Halcón Airguns'; workbook.title = title;
   const sheet = workbook.addWorksheet('Compradores', { views: [{ state: 'frozen', ySplit: 1 }] });
   sheet.columns = [{ header: 'Email', key: 'email', width: 36 }, { header: 'Apellido', key: 'lastName', width: 25 }, { header: 'Nombre', key: 'firstName', width: 25 }, { header: 'DNI', key: 'dni', width: 16 }, { header: 'Números comprados', key: 'numbers', width: 55 }];
@@ -71,7 +72,7 @@ export async function buyersWorkbook(title: string, buyers: Buyer[]) {
     let chunk: string[] = []; let length = 0;
     const add = () => { sheet.addRow({ email: buyer.email, lastName: buyer.lastName, firstName: buyer.firstName, dni: buyer.dni, numbers: chunk.join(', ') }); chunk = []; length = 0; };
     for (const number of buyer.numbers) {
-      const value = String(number).padStart(3, '0');
+      const value = String(number).padStart(digits, '0');
       if (length + value.length + 2 > 30000) add();
       chunk.push(value); length += value.length + 2;
     }

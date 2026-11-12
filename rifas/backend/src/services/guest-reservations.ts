@@ -1,7 +1,8 @@
+import { recordActivity } from './activity.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { atomic } from '../db.js';
 import { AppError } from '../errors.js';
-import { expireOrders } from './orders.js';
+import { expireOrders, salesClosed } from './orders.js';
 export const GUEST_HOLD_MS = 10 * 60000;
 export class GuestReservationsService {
   constructor(private db: PrismaClient) {}
@@ -20,7 +21,8 @@ export class GuestReservationsService {
       const raffle = await tx.raffle.findUnique({ where: { id: raffleId } });
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
       if (raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta rifa no admite nuevas reservas.');
-      if (numbers.some(n => n > raffle.totalTickets)) throw new AppError(400, 'Hay números fuera del rango de esta rifa.');
+      if(salesClosed(raffle.drawAt))throw new AppError(409,'La venta de números ya cerró para la Nocturna prevista.');
+      if (numbers.some(n => !Number.isInteger(n)||n < raffle.numberStart || n >= raffle.numberStart + raffle.totalTickets)) throw new AppError(400, 'Hay números fuera del rango de esta rifa.');
       const held = await tx.allocation.count({ where: { order: { userId: null, guestClientHash: clientHash, status: 'RESERVED', ...(existing ? { id: { not: existing.id } } : {}) } } });
       if (held + numbers.length > 20) throw new AppError(429, 'Hay demasiados números pendientes de iniciar sesión desde esta conexión. Ingresá para continuar.');
       if (await tx.allocation.count({ where: { raffleId, number: { in: numbers }, ...(existing ? { orderId: { not: existing.id } } : {}) } })) throw new AppError(409, 'Uno de esos números acaba de reservarse. Elegí otro.');
@@ -30,7 +32,7 @@ export class GuestReservationsService {
         await tx.order.update({ where: { id: existing.id }, data: { guestTokenHash: null, ...(existing.status === 'RESERVED' ? { status: 'CANCELLED' } : {}) } });
       }
       const order = await tx.order.create({ data: { guestTokenHash: tokenHash, guestClientHash: clientHash, raffleId, numbers: [...numbers].sort((a,b) => a-b), unitPriceCents: raffle.ticketPriceCents, amountCents: raffle.ticketPriceCents * numbers.length, expiresAt, allocations: { create: numbers.map(number => ({ raffleId, number })) } } });
-      await tx.auditLog.create({ data: { action: 'GUEST_RESERVED', entityId: order.id } });
+      await recordActivity(tx,{ data: { action: 'GUEST_RESERVED', entityId: order.id } });
       return order;
     });
   }
@@ -46,7 +48,7 @@ export class GuestReservationsService {
       const held = await tx.allocation.count({ where: { order: { userId, status: { in: ['RESERVED','PAYMENT_PENDING','AWAITING_RECEIPT','UNDER_REVIEW','NEEDS_ATTENTION'] } } } });
       if (held + order.numbers.length > 20) throw new AppError(409, 'Tu cuenta ya tiene reservas pendientes. Revisalas en Mis números para continuar.');
       const updated = await tx.order.update({ where: { id: order.id }, data: { userId, guestClientHash: null, expiresAt: new Date(Date.now() + 5 * 60000) } });
-      await tx.auditLog.create({ data: { actorId: userId, action: 'GUEST_RESERVATION_CLAIMED', entityId: order.id } });
+      await recordActivity(tx,{ data: { actorId: userId, action: 'GUEST_RESERVATION_CLAIMED', entityId: order.id } });
       return { id: updated.id, raffleId: updated.raffleId, numbers: updated.numbers };
     });
   }

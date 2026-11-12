@@ -11,7 +11,7 @@ export function RaffleCard({ raffle: r, featured = false }: { raffle: Raffle; fe
     <article className={`raffle-card${featured ? ' raffle-card-featured' : ''}`} aria-labelledby={titleId}>
       <div className="raffle-card-art">
         <img src="/logo.png" alt="" />
-        <span className={`raffle-state${active ? '' : ' finished'}`}>{active ? 'INSCRIPCIONES ABIERTAS' : 'FINALIZADA'}</span>
+        <span className={`raffle-state${active ? '' : ' finished'}`}>{active ? 'INSCRIPCIONES ABIERTAS' : r.status==='CLOSING'?'VENTAS CERRADAS':'FINALIZADA'}</span>
         <span className="card-serial">HALCÓN AIRGUNS / RIFAS</span>
       </div>
       <div className="raffle-card-body">
@@ -19,7 +19,7 @@ export function RaffleCard({ raffle: r, featured = false }: { raffle: Raffle; fe
         <h2 id={titleId}>{r.title}</h2>
         <p className="raffle-description">{r.description || r.prize.description || 'Elegí tus números y compartí la pasión de Halcón Airguns.'}</p>
         {r.winnerNumber != null ? (
-          <div className="winner">NÚMERO GANADOR <strong>{String(r.winnerNumber).padStart(3, '0')}</strong></div>
+          <div className="winner">NÚMERO GANADOR <strong>{String(r.winnerNumber).padStart(2, '0')}</strong></div>
         ) : (
           <div className="raffle-price-block">
             <div className="card-price">{money(r.ticketPriceCents)}<small>por número</small></div>
@@ -27,14 +27,14 @@ export function RaffleCard({ raffle: r, featured = false }: { raffle: Raffle; fe
               <span style={{ width: `${Math.min(100, sold / r.totalTickets * 100)}%` }} />
             </div>
             <div className="availability-caption">
-              <span>{available == null ? 'Consultá la disponibilidad' : `${available} ${available === 1 ? 'disponible' : 'disponibles'}`}</span>
+              <span>{!active?'Venta cerrada':available == null ? 'Consultá la disponibilidad' : `${available} ${available === 1 ? 'disponible' : 'disponibles'}`}</span>
               <span>{r.totalTickets} números</span>
             </div>
           </div>
         )}
-        {r.drawAt && <p className="raffle-draw-date">Fecha prevista: {date(r.drawAt)}</p>}
+        {r.closedEarly&&<p className="raffle-draw-date">Cierre anticipado. Resultado de la Nocturna del {r.resultDate?.split('-').reverse().join('/')}.</p>}{r.drawAt && <p className="raffle-draw-date">Fecha prevista: {date(r.drawAt)}</p>}
         <Link className={`btn ${active ? 'btn-primary' : 'btn-outline-primary'} w-100`} to={`/rifas/${r.id}`}>
-          {active ? available === 0 ? 'VER DISPONIBILIDAD' : 'ELEGIR MIS NÚMEROS' : 'VER RESULTADO'} <span aria-hidden>↗</span>
+          {active ? available === 0 ? 'VER DISPONIBILIDAD' : 'ELEGIR MIS NÚMEROS' : r.status==='CLOSING'?'VER ESTADO':'VER RESULTADO'} <span aria-hidden>↗</span>
         </Link>
         {active && <span className="raffle-participation-note">Reservá primero. Después elegí cómo pagar.</span>}
       </div>

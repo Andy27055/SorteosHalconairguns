@@ -9,10 +9,16 @@ enum Role {
   USER
   ADMIN
 }
+enum AdminType {
+  PRIMARY
+  FUNCTIONAL
+}
 enum RaffleStatus {
   DRAFT
   ACTIVE
+  CLOSING
   FINISHED
+  CANCELLED
 }
 enum OrderStatus {
   RESERVED
@@ -42,10 +48,13 @@ model User {
   address String?
   passwordHash String
   role Role @default(USER)
+  adminType AdminType?
   tokenVersion Int @default(0)
   active Boolean @default(true)
+  emailVerifiedAt DateTime?
   createdAt DateTime @default(now())
   orders Order[]
+  verifications EmailVerification[]
 }
 model Prize {
   id String @id @default(cuid())
@@ -62,13 +71,55 @@ model Raffle {
   prize Prize @relation(fields: [prizeId], references: [id], onDelete: Restrict)
   ticketPriceCents Int
   totalTickets Int
+  numberStart Int @default(0)
+  lotteryDigits Int? @default(2)
+  lotteryResult Json?
+  winnerOrderId String?
+  winnerDisplayName String?
   status RaffleStatus @default(DRAFT)
   drawAt DateTime?
   winnerNumber Int?
   drawnAt DateTime?
+  closingAt DateTime?
+  resultDate String?
+  closedEarly Boolean @default(false)
+  closingNote String?
+  cancelledAt DateTime?
+  cancellationReason String?
+  cancellationBuyers Json?
   createdAt DateTime @default(now())
   orders Order[]
   allocations Allocation[]
+  notifications RaffleEmail[]
+  @@index([status, drawAt])
+}
+enum RaffleEmailKind {
+  RAFFLE_CANCELLED
+  RAFFLE_EARLY_CLOSURE
+  RAFFLE_RESULT_ADMIN
+}
+model RaffleEmail {
+  id String @id @default(cuid())
+  raffleId String
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Restrict)
+  eventKey String @unique
+  kind RaffleEmailKind
+  toEmail String
+  adminUserId String?
+  payload Json
+  status EmailStatus @default(PENDING)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lockedAt DateTime?
+  sentAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
+}
+model LotteryDraw {
+  date String @id
+  payload Json
+  createdAt DateTime @default(now())
 }
 model Order {
   id String @id @default(cuid())
@@ -123,6 +174,7 @@ enum EmailStatus {
   SKIPPED
 }
 enum OrderEmailKind {
+  RAFFLE_WINNER
   PURCHASE_CONFIRMED
   PURCHASE_REJECTED
   REFUND_REQUESTED
@@ -171,8 +223,26 @@ model Receipt {
 model AuditLog {
   id String @id @default(cuid())
   actorId String?
+  actorRole Role?
   action String
   entityId String
   detail Json?
   createdAt DateTime @default(now())
+}
+model EmailVerification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  email String
+  expiresAt DateTime
+  consumedAt DateTime?
+  status EmailStatus @default(PENDING)
+  attempts Int @default(0)
+  lockedAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  sentAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
 }

@@ -1,3 +1,4 @@
+import { WinnerAnnouncement } from './WinnerAnnouncement';
 import { Link } from 'react-router-dom';
 import { useFetch } from '../hooks/useFetch';
 import type { Raffle } from '../types';
@@ -6,14 +7,16 @@ import { RaffleCard } from './RaffleCard';
 
 export function RafflesHome() {
   const { data, loading, error, refresh } = useFetch<Raffle[]>('/raffles', 15000);
-  const active = data?.filter(r => r.status === 'ACTIVE') ?? [];
+  const active = data?.filter(r => ['ACTIVE','CLOSING'].includes(r.status)) ?? [];
+  const accepting=active.filter(r=>r.status==='ACTIVE').length;
   const finished = data?.filter(r => r.status === 'FINISHED') ?? [];
+  const latest=[...finished].filter(r=>r.winnerNumber!=null&&r.lotteryResult).sort((a,b)=>new Date(b.drawnAt||0).getTime()-new Date(a.drawnAt||0).getTime())[0];
   return (
     <div className="raffles-home">
       <section id="rifas" className="catalog-section catalog-first" aria-labelledby="raffles-heading">
         <div className="section-heading catalog-heading">
           <div><span className="eyebrow">TU PRÓXIMA OPORTUNIDAD</span><h1 id="raffles-heading">RIFAS HALCÓN<span>.</span></h1><p>Elegí tu rifa y reservá tus números.</p></div>
-          {active.length > 0 && <span className="catalog-count"><i aria-hidden />{active.length === 1 ? '1 rifa activa' : `${active.length} rifas activas`}</span>}
+          {active.length > 0 && <span className="catalog-count"><i aria-hidden />{accepting===0?'Resultado pendiente':accepting === 1 ? '1 rifa activa' : `${accepting} rifas activas`}</span>}
         </div>
         {loading && <Loading />}
         <ErrorBox message={error} retry={refresh} />
@@ -24,6 +27,7 @@ export function RafflesHome() {
           {active.map(r => <RaffleCard key={r.id} raffle={r} featured={active.length === 1} />)}
         </div>
       </section>
+      {latest&&<WinnerAnnouncement raffle={latest}/>}
       <section className="trust-strip" aria-label="Cómo participar">
         <div><b>01</b><span>Elegí tus números<small>Consultá cuáles están disponibles.</small></span></div>
         <div><b>02</b><span>Elegí cómo pagar<small>Mercado Pago o transferencia, según disponibilidad.</small></span></div>

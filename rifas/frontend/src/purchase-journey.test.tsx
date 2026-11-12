@@ -12,7 +12,7 @@ describe('continuidad durante autenticación',()=>{
   it('tras ingresar reclama la reserva y abre la misma compra',async()=>{
     vi.mocked(post).mockImplementation(async(url)=>url==='/auth/login'?{user:{id:'user'},token:'test-token'}:{order:{id:'guest-order'}} as never);
     render(<MemoryRouter initialEntries={[{pathname:'/ingresar',state:{guestReservation:fixture.reservation}}]}><Routes><Route path="/ingresar" element={<AuthPage/>}/><Route path="/compras/:id" element={<p>Compra conservada</p>}/></Routes></MemoryRouter>);
-    expect(screen.getByText('011 · 012')).toBeInTheDocument();
+    expect(screen.getByText('11 · 12')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Usuario o email'),{target:{value:'ana'}});fireEvent.change(screen.getByLabelText('Contraseña'),{target:{value:'password-larga'}});fireEvent.click(screen.getByRole('button',{name:/^INGRESAR/}));
     await waitFor(()=>expect(screen.getByText('Compra conservada')).toBeInTheDocument());expect(post).toHaveBeenCalledWith('/guest-reservations/claim');
   });
@@ -22,7 +22,7 @@ describe('listado por rifa',()=>{
     vi.mocked(downloadPrivateFile).mockResolvedValue(undefined);
     render(<BuyersPanel raffles={[{id:'rifa',title:'Rifa test'} as never]}/>);
     fireEvent.change(screen.getByLabelText('Seleccioná una rifa'),{target:{value:'rifa'}});
-    expect(screen.getByRole('columnheader',{name:'Email'})).toBeInTheDocument();expect(screen.getByText('01234567')).toBeInTheDocument();expect(screen.getByText('011 · 012')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader',{name:'Email'})).toBeInTheDocument();expect(screen.getByText('01234567')).toBeInTheDocument();expect(screen.getByText('11 · 12')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'DESCARGAR EXCEL'}));await waitFor(()=>expect(downloadPrivateFile).toHaveBeenCalledWith('/admin/raffles/rifa/buyers.xlsx','compradores-rifa.xlsx'));
   });
 });

@@ -1,3 +1,4 @@
+import './config.js';
 import { PrismaClient, Prisma } from './generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 export const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL || 'postgresql://halcon:halcon_local@localhost:5432/halcon', connectionTimeoutMillis: 5000, max: 10 }) });

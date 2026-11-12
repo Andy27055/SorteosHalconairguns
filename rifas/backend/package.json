@@ -13,7 +13,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:import": "tsx scripts/import-legacy.ts",
     "receipts:purge": "tsx scripts/purge-receipts.ts",
-    "test:db": "tsx scripts/test-db.ts"
+    "test:db": "tsx scripts/test-db.ts",
+    "admins:provision": "tsx scripts/provision-admins.ts",
+    "mail:test": "tsx scripts/test-verification-mail.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
@@ -29,6 +31,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemailer": "^10.4.0",
+    "pdfjs-dist": "^6.5.438",
     "pg": "^8.23.0",
     "qs": "^6.17.1",
     "uuid": "^11.1.1",

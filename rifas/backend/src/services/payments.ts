@@ -1,3 +1,5 @@
+import { recordActivity } from './activity.js';
+import {queueRaffleBuyerEmails} from './raffle-emails.js';
 import { buyerSnapshot } from './buyer-identity.js';
 import { queuePurchaseEmail,queueOrderEmail } from './purchase-emails.js';
 import { releaseRefundNumbers } from './refund-state.js';
@@ -74,7 +76,7 @@ export class PaymentsService {
       const current = await tx.order.findUniqueOrThrow({ where: { id } });
       if (current.status !== 'PAYMENT_PENDING') throw new AppError(409, 'La compra cambió de estado mientras se generaba el enlace. Revisá su estado antes de pagar.');
       await tx.order.update({ where: { id }, data: { preferenceId: pref!.id, checkoutUrl, paymentCreatingAt: null } });
-      await tx.auditLog.create({ data: { actorId: userId, action: 'MP_PREFERENCE_CREATED', entityId: id } });
+      await recordActivity(tx,{ data: { actorId: userId, action: 'MP_PREFERENCE_CREATED', entityId: id } });
     });
     return { checkoutUrl };
   }
@@ -84,26 +86,34 @@ export class PaymentsService {
       const order = await tx.order.findFirst({ where: { OR: [{ id: payment.external_reference! }, { legacyReference: payment.external_reference! }] } });
       if (!order) return;
       if((order.refundRequestedAt||order.status==='REFUND_PENDING'||order.status==='REFUNDED')&&(!['refunded','charged_back'].includes(payment.status)||order.method!=='MERCADO_PAGO'||order.paymentId!==String(payment.id))){
-        await tx.auditLog.create({data:{action:'PAYMENT_IGNORED_AFTER_REFUND_REQUEST',entityId:order.id,detail:{paymentId:String(payment.id),status:payment.status}}});return;
+        await recordActivity(tx,{data:{action:'PAYMENT_IGNORED_AFTER_REFUND_REQUEST',entityId:order.id,detail:{paymentId:String(payment.id),status:payment.status}}});return;
       }
       const markAttention = async (reason: string) => {
         await tx.order.update({ where: { id: order.id }, data: { status: 'NEEDS_ATTENTION', paymentId: String(payment.id), paymentStatus: payment.status, decisionNote: reason } });
-        await tx.auditLog.create({ data: { action: 'PAYMENT_NEEDS_ATTENTION', entityId: order.id, detail: { reason, paymentId: String(payment.id) } } });
+        await recordActivity(tx,{ data: { action: 'PAYMENT_NEEDS_ATTENTION', entityId: order.id, detail: { reason, paymentId: String(payment.id) } } });
       };
       if (order.paymentId && order.paymentId !== String(payment.id) && ['PAID','REFUND_PENDING','REFUNDED'].includes(order.status)) {
-        await tx.auditLog.create({ data: { action: 'DUPLICATE_PAYMENT', entityId: order.id, detail: { paymentId: String(payment.id) } } }); return;
+        await recordActivity(tx,{ data: { action: 'DUPLICATE_PAYMENT', entityId: order.id, detail: { paymentId: String(payment.id) } } }); return;
       }
       if (order.method !== 'MERCADO_PAGO' || payment.currency_id !== 'ARS' || Math.round(Number(payment.transaction_amount) * 100) !== order.amountCents || payment.live_mode !== !this.cfg.mpSandbox) {
         await markAttention('El pago no coincide con medio, importe, moneda o entorno de la compra. Requiere conciliación.'); return;
       }
       if (payment.status === 'approved') {
         if (order.status === 'PAID' && order.paymentId === String(payment.id)) return;
+        const raffle=await tx.raffle.findUniqueOrThrow({where:{id:order.raffleId}});
+        if(raffle.status==='CANCELLED'){
+          await tx.order.update({where:{id:order.id},data:{status:'REFUND_PENDING',paidAt:new Date(),paymentId:String(payment.id),paymentStatus:payment.status,refundRequestedAt:new Date(),refundAmountCents:order.amountCents,decisionNote:'El pago ingresó después de cancelar la rifa. Reembolso pendiente.'}});
+          await tx.allocation.deleteMany({where:{orderId:order.id}});
+          await queueRaffleBuyerEmails(tx,order.raffleId,'RAFFLE_CANCELLED',[order.id]);return;
+        }
+        if(raffle.status==='FINISHED'){await markAttention('El pago ingresó después de publicar el resultado. Revisar su devolución.');return;}
         const allocations = await tx.allocation.findMany({ where: { raffleId: order.raffleId, number: { in: order.numbers } } });
         if (allocations.length !== order.numbers.length || allocations.some(a => a.orderId !== order.id)) {
           await markAttention('Pago aprobado después de perder la reserva. Requiere asignación o devolución manual.'); return;
         }
         await tx.order.update({ where: { id: order.id }, data: { status: 'PAID', paidAt: new Date(), paymentId: String(payment.id), paymentStatus: payment.status, decisionNote: null } });
         await queuePurchaseEmail(tx, order.id);
+        if(raffle.closedEarly&&raffle.status==='CLOSING')await queueRaffleBuyerEmails(tx,order.raffleId,'RAFFLE_EARLY_CLOSURE');
       } else if (['refunded','charged_back'].includes(payment.status)) {
         await releaseRefundNumbers(tx,order.id);
         await tx.order.update({ where: { id: order.id }, data: { status: 'REFUNDED', paymentId: String(payment.id), paymentStatus: payment.status,refundRequestedAt:order.refundRequestedAt||new Date(),refundCompletedAt:order.refundCompletedAt||new Date(),refundAmountCents:order.amountCents,refundReference:`Mercado Pago ${payment.id}`,decisionNote:'El proveedor registró la devolución o contracargo de esta compra.' } });
@@ -117,7 +127,7 @@ export class PaymentsService {
       } else {
         await tx.order.update({ where: { id: order.id }, data: { paymentStatus: payment.status } });
       }
-      await tx.auditLog.create({ data: { action: 'MP_PAYMENT_UPDATED', entityId: order.id, detail: { paymentId: String(payment.id), status: payment.status } } });
+      await recordActivity(tx,{ data: { action: 'MP_PAYMENT_UPDATED', entityId: order.id, detail: { paymentId: String(payment.id), status: payment.status } } });
     });
   }
   async reconcile(id: string) {
