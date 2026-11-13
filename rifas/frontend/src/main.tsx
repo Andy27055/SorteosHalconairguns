@@ -8,5 +8,6 @@ import './purchases.css';
 import './receipt-viewer.css';
 import './refunds.css';
 import './identity-lottery.css';
+import './password.css';
 import { App } from './App';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

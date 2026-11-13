@@ -8,4 +8,7 @@ data/receipts/
 **/data/receipts/
 *.log
 .env.*.local
+**/.admin-accounts.local.json
 playwright-artifacts/
+load-test-results*.json
+.demo/

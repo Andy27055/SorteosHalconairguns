@@ -9,14 +9,23 @@ export async function api<T>(url: string, options: RequestInit = {}): Promise<T>
   let response: Response;
   try { response = await fetch(`${API_URL}${url}`, { ...options, credentials: 'include', headers, signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) }); }
   catch (error) { if (options.signal?.aborted) throw error; throw new ApiError('No pudimos conectar. Revisá tu conexión y volvé a intentar.', 0); }
-  const data = await response.json().catch(() => ({ error: 'El servidor no devolvió una respuesta válida.' }));
+  const data = await responseJson(response);
   if (!response.ok) {
-    if (response.status === 401 && !url.startsWith('/auth/login')) window.dispatchEvent(new Event('session-expired'));
+    if (response.status === 401 && data.code !== 'DEMO_ACCESS_REQUIRED' && !url.startsWith('/auth/login')) window.dispatchEvent(new Event('session-expired'));
     throw new ApiError(data.error || 'No se pudo completar la operación.', response.status, data.fields);
   }
   return data as T;
 }
 export const post = <T>(url: string, body?: unknown) => api<T>(url, { method: 'POST', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+async function responseJson(response: Response) {
+  try { return await response.json(); }
+  catch {
+    if ([401, 403].includes(response.status) || /(?:cloudflareaccess\.com|login\.trycloudflare\.com)/i.test(response.url || '')) {
+      throw new ApiError('El acceso temporal a la demostración venció. Volvé a abrir su enlace y completá el acceso antes de iniciar sesión.', response.status);
+    }
+    throw new ApiError('El servidor devolvió un formato inesperado. Actualizá la página y volvé a intentar.', response.status);
+  }
+}
 export async function fetchReceipt(id: string, signal?: AbortSignal): Promise<Blob> {
   let res: Response;
   try { res = await fetch(`${API_URL}/receipts/${encodeURIComponent(id)}`, { credentials: 'include', headers: bearer ? { Authorization: `Bearer ${bearer}` } : {}, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) }); }

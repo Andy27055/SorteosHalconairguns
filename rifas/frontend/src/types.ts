@@ -1,6 +1,7 @@
 export interface User { adminType?:'PRIMARY'|'FUNCTIONAL'|null; emailVerifiedAt?:string|null; id: string; username: string; email: string; fullName: string; firstName?: string | null; lastName?: string | null; role: 'USER' | 'ADMIN'; active?: boolean; createdAt?: string; dni?: string; address?: string }
 export interface GuestReservation { id: string; raffleId: string; numbers: number[]; expiresAt: string }
 export interface Prize { id: string; name: string; description: string }
+export interface AdminRaffle extends Raffle { revenueCents: number }
 export interface Raffle { closingAt?:string|null;resultDate?:string|null;closedEarly?:boolean;closingNote?:string|null;cancelledAt?:string|null;cancellationReason?:string|null; numberStart?:number;lotteryDigits?:number|null;winnerDisplayName?:string|null;lotteryResult?:{date:string;head:string;drawNumber:string;sourceUrl?:string;sourceSha256:string;checkedAt:string}|null; id: string; title: string; description: string; prize: Prize; prizeId: string; ticketPriceCents: number; totalTickets: number; status: 'DRAFT' | 'ACTIVE' | 'CLOSING' | 'FINISHED' | 'CANCELLED'; drawAt?: string | null; winnerNumber?: number | null; drawnAt?: string; sold?: number; available?: number }
 export interface Receipt { id: string; mimeType: string; size: number; uploadedAt: string; deleteAfter: string; deletedAt?: string | null }
 export type OrderStatus = 'RESERVED' | 'PAYMENT_PENDING' | 'AWAITING_RECEIPT' | 'UNDER_REVIEW' | 'PAID' | 'REJECTED' | 'CANCELLED' | 'EXPIRED' | 'NEEDS_ATTENTION' | 'REFUND_PENDING' | 'REFUNDED';

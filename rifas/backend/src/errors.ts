@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
 import multer from 'multer';
+import { transactionConflict } from './transaction-conflict.js';
 export class AppError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -10,6 +11,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(400).json({ error: 'Revisá los campos indicados.', fields: error.flatten().fieldErrors }); return;
   }
   if (error instanceof AppError) { res.status(error.status).json({ error: error.message }); return; }
+  if (transactionConflict(error)) { res.status(409).json({ error: 'Hubo otra operación simultánea. Volvé a intentarlo.' }); return; }
   if (error instanceof multer.MulterError) { res.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'El comprobante debe pesar hasta 5 MB.' : 'La carga del archivo no es válida.' }); return; }
   const code = (error as {code?: string}).code;
   const mapped: Record<string, [number, string]> = {

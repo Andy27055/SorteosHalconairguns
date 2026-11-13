@@ -112,3 +112,53 @@ Importante para continuidad: ahora SMTP está habilitado en el proceso local, ad
 Todos los cambios quedaron guardados en disco; no se realizó commit, push ni despliegue. Se detuvo npm run dev (web y API) y se detuvieron los contenedores del proyecto halcon-airguns, conservando la base de datos y los volúmenes.
 
 Para retomar: iniciar Docker Desktop si hace falta, ejecutar docker compose -p halcon-airguns up -d db y npm.cmd run dev desde rifas. Web http://localhost:5173, API http://localhost:3011. SMTP real está habilitado y los cierres programados se retoman al iniciar. No reencolar los ocho avisos de demostración omitidos. La rifa heredada de 1.000 números sigue con ventas cerradas y pendiente de regla de cifras.
+
+### Preparación conservadora de concurrencia (12/11/2026)
+
+Se aplicaron caché pública de un segundo con consultas compartidas, lecturas sin limpieza global, cola de reservas por rifa compartida entre visitantes y cuentas, reintentos compatibles con conflictos del adaptador pg, límites por cuenta/navegador y tope de cuatro cargas de comprobantes. La estética, frecuencia de la grilla, reglas y plazos comerciales se conservan. No se cambió .env, no se agregaron dependencias ni migraciones y no se modificaron compras reales.
+
+Validación: 72 pruebas de backend, 83 PostgreSQL, 45 frontend y ambos builds correctos. Prueba local de 809 usuarios virtuales con 128 conexiones pasó: 2.427 lecturas iniciales, 2.427 periódicas, un titular entre 809 intentos del mismo número y 100 reservas distintas aceptadas. Intento instantáneo de 809 conexiones falló con ECONNREFUSED; informe fallido preservado. No garantizar capacidad de producción sin repetir la medición externa contra alojamiento/Neon de pruebas, incluidos bcrypt y archivos. Ver [detalle e informes](16-CARGA-Y-CONCURRENCIA.md).
+
+Sólo se inició PostgreSQL para usar esquemas descartables. La aplicación habitual, SMTP y cierres automáticos no se iniciaron. Los procesos HTTP de prueba terminaron y sus esquemas se eliminaron; PostgreSQL se detiene al terminar para conservar el estado previo. No se hizo commit, push ni despliegue.
+
+### Demo desde teléfonos iniciada posteriormente (12/11/2026)
+
+El usuario eligió enlace temporal desde la PC para mostrar el sitio a Osvaldo y José. Se inició PostgreSQL y `node scripts/demo.mjs`: servidor en 127.0.0.1:3012, build React con /api relativo y Quick Tunnel HTTPS. La revisión automática rechazó la primera propuesta sin restricciones; se corrigió con --allowed-mail para halconairguns@gmail.com, osvaljgomez@gmail.com y jlgorosito43@gmail.com. Sólo esos correos pueden superar el código de acceso de Cloudflare y luego se aplican las cuentas/permisos del sitio. Las rutas de página y API anónimas redirigen a Cloudflare Access.
+
+Demo activa al terminar. La dirección vigente y los PID están en `.demo/session.json` (ignorado); registros del túnel en `.demo/tunnel.log`. Sesión de ejecución de esta conversación: 96718. Ctrl+C en el iniciador cierra API y túnel; luego detener db si se pide apagar todo. HOST se agregó a la configuración con valor predeterminado 0.0.0.0; la demo lo limita a loopback. No se cambió .env. SMTP real queda activo y las acciones de la demo se guardan en la base actual; Mercado Pago queda deshabilitado sólo en ese proceso. Se verificaron 5 usuarios, 3 rifas y 19 compras antes de arrancar.
+
+Neon y Render no se conectaron ni se utilizaron. No se migró, contrató, desplegó ni publicó en Git. La compra futura del dominio no elimina la necesidad de alojamiento. Ver [guía de demo](17-DEMO-DESDE-PC.md).
+
+### Corrección de ingreso y botón de contraseña (12/11/2026)
+
+El usuario reportó rechazo no JSON después del acceso de Cloudflare. El backend local respondía JSON correctamente; se encontró el reporte abierto cloudflare/cloudflared#1752 compatible con vencimiento prematuro de la sesión protegida. No se confirmó el tiempo exacto del teléfono. Se reemplazó --allowed-mail por una puerta propia de demo antes de todo contenido y API: clave aleatoria de 144 bits en `.demo/acceso.txt`, cookie firmada Secure/HttpOnly de cuatro horas, diez intentos por IP cada diez minutos. La demo sigue siendo privada y cada administrador utiliza además su cuenta. La revisión automática aceptó este esquema tras revisar su protección. Nunca abrir el túnel contra un servidor sin DEMO_ACCESS_CODE.
+
+La demo anterior se cerró y el nuevo enlace/PID están en `.demo/session.json`. Sesión de ejecución actual: 22194. Se mantiene PostgreSQL, SMTP y el puerto 3012 loopback; no se cambió .env. La clave y los registros se excluyen de Git/Docker. El usuario debe copiar la clave desde su archivo y compartirla únicamente con Osvaldo y José.
+
+Se agregó PasswordInput a ingreso, registro, perfil y verificación; botón de ojo accesible de 44 px, oculto inicialmente y sin cambiar el valor. Los errores no JSON ahora se rechazan explícitamente y se distingue el acceso a la demo de un error de contraseña. Ambos builds y pruebas correctos: 75 backend y 49 frontend. Ver guía 17 para la prueba móvil optativa sobre HTTPS.
+
+La prueba HTTPS real terminó correctamente en ambos anchos (390 y 320 px): bloqueo anónimo, acceso con clave, botón de ojo, login de la cuenta principal, panel admin y recarga conservando la sesión. Las dos cookies son Secure/HttpOnly. Se inspeccionó la captura móvil. El enlace actual quedó activo en `.demo/session.json`; se abrió `.demo/acceso.txt` en el editor para que el usuario copie la clave sin imprimirla en el chat ni en registros.
+
+### Acceso directo solicitado por el usuario (12/11/2026)
+
+El usuario pidió quitar la pantalla adicional para las pruebas con Osvaldo y José. La demo inicia ahora directamente en el catálogo/ingreso normal, con DEMO_ACCESS_CODE vacío. Cloudflare mantiene sólo el túnel HTTPS. La revisión automática aceptó el cambio al comprobar la autorización explícita y que los endpoints privados conservan sesión, rol y propiedad. Las 17 pruebas de permisos pasan. El modo de clave adicional queda opcional con DEMO_REQUIRE_CODE=true; no usarlo por defecto si el usuario no lo solicita.
+
+Se detuvo la sesión anterior 22194 y la demo actual está en la sesión 68420. La dirección y los PID vigentes están en `.demo/session.json`, protection=application-auth. `.demo/acceso.txt` ya no se genera. Se mantienen SMTP, PostgreSQL, el puerto 3012 loopback y las cuentas actuales. El catálogo está accesible a quien tenga el enlace; perfiles, compras, compradores, comprobantes y administración exigen los permisos normales. Esta instrucción sustituye las indicaciones previas de mantener obligatoriamente DEMO_ACCESS_CODE en la demo.
+
+### Confirmación para cerrar sesión
+
+Se reemplazó Salir por Cerrar sesión. Un modal pequeño pregunta si se desea cerrar la sesión, con Sí, estoy seguro y Cancelar. Cancelar no llama a la API; confirmar hace una sola llamada y deshabilita los controles mientras espera. Un error queda visible dentro del modal. Build frontend correcto; comprobado con respuestas simuladas a 390 y 320 px, sin desbordes ni cierre de sesiones reales. El build actualizado ya se sirve en el mismo enlace de demo; basta recargar el navegador.
+
+### Recaudación confirmada por rifa
+
+Por solicitud del usuario se retiró la recaudación general de las tarjetas superiores del panel y se muestra el importe propio de cada rifa en Administración → Rifas, también en el archivo de canceladas. La tarjeta superior ahora muestra Participantes. GET /api/admin/raffles incorpora revenueCents: suma de amountCents de órdenes PAID agrupadas por raffleId; conserva importes históricos y excluye reservas, pendientes, rechazos y devoluciones. Los totales son privados para administradores y no se agregan a los endpoints públicos. Se conservó /admin/stats compatible para clientes anteriores. La lista de rifas consulta cada 15 segundos mientras esa pestaña está seleccionada y se refresca tras las acciones locales.
+
+Verificación: 84 pruebas PostgreSQL y 49 frontend correctas, ambos builds correctos. Nueva prueba financiera con dos rifas, importes históricos y todos los estados excluidos; rifa sin pagos devuelve cero. Se comparó la API real con la suma de PostgreSQL sin imprimir importes y se comprobó interfaz a 390/320 px sin desbordes. No se modificaron compras reales.
+
+Se reinició la demo para cargar el backend: sesión actual 18660, puerto 3012, dirección vigente y PID en `.demo/session.json`. Conserva acceso directo (application-auth) y requiere volver a iniciar sesión tras el reinicio. No detener estos procesos hasta que el usuario pida cerrar la demo.
+
+### Cierre final solicitado por el usuario
+
+Se guardaron los cambios y se cerró la demo (iniciador, API y túnel), dejando el enlace temporal fuera de servicio. Se verificó que sus PID ya no existen y que los puertos 3012, 3011 y 5173 rechazan conexiones. PostgreSQL quedó exited y no hay contenedores activos; se solicitó además el cierre de Docker Desktop. Se eliminó el registro temporal de sesión ya inactiva. Las compras, usuarios, comprobantes y volúmenes se conservan. No se hizo commit, push ni despliegue.
+
+Al retomar: abrir Docker Desktop, ejecutar docker compose -p halcon-airguns up -d db y npm.cmd run demo desde rifas si se necesita acceso desde teléfonos, o npm.cmd run dev para uso local. La demo inicia directamente en el sitio (sin clave extra), genera un enlace nuevo y exige las cuentas habituales para comprar/administrar. SMTP real y cierres automáticos se reanudan al iniciar el servidor. Los últimos cambios incluyen confirmación de cierre de sesión, redirección a /ingresar y recaudación privada por rifa. Última verificación: ambos builds correctos, 84 pruebas PostgreSQL y 49 frontend correctas.

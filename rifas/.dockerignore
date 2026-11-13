@@ -7,6 +7,10 @@ node_modules
 .env
 .env.*
 **/.env.*
+**/.admin-accounts.local.json
+**/backups
+**/.demo
+load-test-results*.json
 .git
 Apuntes
 data

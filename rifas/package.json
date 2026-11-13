@@ -11,6 +11,7 @@
     "dev": "concurrently -k -n API,WEB \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
     "start": "npm run start -w backend",
+    "demo": "npm run build && node scripts/demo.mjs",
     "test": "npm run test -w backend && npm run test -w frontend",
     "test:watch": "concurrently \"npm run test:watch -w backend\" \"npm run test:watch -w frontend\"",
     "db:migrate": "npm run db:migrate -w backend",

@@ -10,6 +10,7 @@ import { prisma } from './db.js';
 import { errorHandler, AppError } from './errors.js';
 import { checkOrigin } from './auth.js';
 import { apiRouter } from './routes.js';
+import { demoAccess } from './demo-access.js';
 import { MercadoPagoGateway, type PaymentGateway } from './services/payments.js';
 export function createApp(db: PrismaClient = prisma, cfg: AppConfig = config, gateway: PaymentGateway = new MercadoPagoGateway(cfg.mpToken)) {
   const app = express();
@@ -19,6 +20,7 @@ export function createApp(db: PrismaClient = prisma, cfg: AppConfig = config, ga
   app.use(cors({ origin: cfg.frontendUrl, credentials: true }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
+  app.use(demoAccess(cfg));
   app.use('/api', checkOrigin(cfg), (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, apiRouter(db, cfg, gateway));
   app.use('/api', (_req, _res, next) => next(new AppError(404, 'Endpoint no encontrado.')));
   if (existsSync(path.join(cfg.frontendDist, 'index.html'))) {

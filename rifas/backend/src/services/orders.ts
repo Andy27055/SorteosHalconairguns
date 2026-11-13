@@ -4,6 +4,7 @@ import type { TransferAccount } from './transfer-accounts.js';
 import type { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { atomic } from '../db.js';
 import { AppError } from '../errors.js';
+import { reserveInOrder } from './reservation-queue.js';
 export const expirable = ['RESERVED', 'PAYMENT_PENDING', 'AWAITING_RECEIPT'] as const;
 export function salesClosed(drawAt:Date|null,now=new Date()){
   if(!drawAt)return false;
@@ -21,7 +22,7 @@ export async function expireOrders(tx: Prisma.TransactionClient, now = new Date(
 export class OrdersService {
   constructor(private db: PrismaClient) {}
   reserve(userId: string, raffleId: string, numbers: number[]) {
-    return atomic(this.db, async tx => {
+    return reserveInOrder(this.db, raffleId, () => atomic(this.db, async tx => {
       await expireOrders(tx);
       const raffle = await tx.raffle.findUnique({ where: { id: raffleId } });
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
@@ -38,7 +39,7 @@ export class OrdersService {
       } });
       await recordActivity(tx,{ data: { actorId: userId, action: 'ORDER_RESERVED', entityId: order.id } });
       return order;
-    });
+    }));
   }
   cancel(userId: string, id: string) {
     return atomic(this.db, async tx => {

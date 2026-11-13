@@ -15,5 +15,7 @@
 13. [Lotería bonaerense, administradores, verificación e historiales](13-LOTERIA-CUENTAS-ACTIVIDAD.md)
 14. [Administración principal, funcional y avisos de spam](14-ADMINISTRACION-PRINCIPAL-Y-SPAM.md)
 15. [Cancelación, cierre anticipado y finalización automática](15-CANCELACION-Y-CIERRE-AUTOMATICO.md)
+16. [Carga, concurrencia y prueba aislada de 809 usuarios](16-CARGA-Y-CONCURRENCIA.md)
+17. [Demostración temporal desde la PC y teléfonos](17-DEMO-DESDE-PC.md)
 
 El análisis original de 111 puntos se conserva como diagnóstico previo. Este índice describe la implementación posterior, no acredita acciones en Trello, GitHub, Discord ni hosting que no se hayan realizado.

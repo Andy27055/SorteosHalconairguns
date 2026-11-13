@@ -123,3 +123,6 @@ Las respuestas de usuario incluyen adminType: PRIMARY, FUNCTIONAL o null. En PUT
 - GET /admin/emails/status y POST /admin/emails/:id/retry abarcan avisos de compras, rifas y verificación.
 
 Ver [reglas vigentes y fuente histórica](15-CANCELACION-Y-CIERRE-AUTOMATICO.md).
+# Recaudación por rifa (actualización)
+
+`GET /api/admin/raffles` conserva el arreglo de rifas y agrega `revenueCents` a cada elemento: total en centavos de las compras en estado `PAID` de esa rifa. Se usan los importes históricos de las compras, independientemente del precio actual del número. Devuelve cero si no hay pagos confirmados. Órdenes pendientes, rechazadas, dadas de baja o reembolsadas no se suman. Requiere administrador principal o funcional; el importe no se incorpora a las rutas públicas de rifas.

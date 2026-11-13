@@ -40,6 +40,28 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('integración PostgreSQL aisl
   it('la reserva de varios números es indivisible',async()=>{await expect(orderService.reserve(userId,raffleId,[1,2])).rejects.toThrow();expect(await db.allocation.count({where:{raffleId,number:2}})).toBe(0);});
   it('mantiene el precio histórico',async()=>{const o=await orderService.reserve(userId,raffleId,[3]);await db.raffle.update({where:{id:raffleId},data:{ticketPriceCents:600000}});expect((await db.order.findUniqueOrThrow({where:{id:o.id}})).amountCents).toBe(500000);});
   it('vencer libera números y conserva la compra',async()=>{const o=await orderService.reserve(userId,raffleId,[4]);await db.order.update({where:{id:o.id},data:{expiresAt:new Date(Date.now()-60000)}});await orderService.reserve(otherId,raffleId,[4]);expect((await db.order.findUniqueOrThrow({where:{id:o.id}})).status).toBe('EXPIRED');});
+  it('la consulta pública omite vencidas sin escribir; la reserva definitiva las libera y no usa caché',async()=>{
+    const prize=await db.prize.create({data:{name:'Premio lectura pública'}});
+    const raffle=await db.raffle.create({data:{title:'Disponibilidad aislada',prizeId:prize.id,totalTickets:100,ticketPriceCents:100,status:'ACTIVE'}});
+    const expired=await db.order.create({data:{userId,raffleId:raffle.id,numbers:[40],unitPriceCents:100,amountCents:100,expiresAt:new Date(Date.now()-60000),allocations:{create:{raffleId:raffle.id,number:40}}}});
+    const review=await db.order.create({data:{userId,raffleId:raffle.id,numbers:[41],unitPriceCents:100,amountCents:100,status:'UNDER_REVIEW',expiresAt:new Date(Date.now()-60000),allocations:{create:{raffleId:raffle.id,number:41}}}});
+    const app=createApp(db,config);
+    const first=await request(app).get(`/api/raffles/${raffle.id}/availability`);
+    expect(first.status).toBe(200);expect(first.body).toEqual([{number:41,status:'HELD'}]);
+    const catalog=await request(app).get('/api/raffles');
+    expect(catalog.body.find((r:{id:string})=>r.id===raffle.id).available).toBe(99);
+    expect((await db.order.findUniqueOrThrow({where:{id:expired.id}})).status).toBe('RESERVED');
+    const bearer=jwt.sign({sub:otherId,version:0},config.jwtSecret,{issuer:'halcon-airguns',audience:'halcon-web',algorithm:'HS256',expiresIn:'1h'});
+    const reserved=await request(app).post('/api/orders').auth(bearer,{type:'bearer'}).send({raffleId:raffle.id,numbers:[40]});
+    expect(reserved.status).toBe(201);
+    const updated=await request(app).get(`/api/raffles/${raffle.id}/availability`);
+    expect(updated.body).toEqual(expect.arrayContaining([{number:40,status:'HELD'},{number:41,status:'HELD'}]));
+    expect((await db.order.findUniqueOrThrow({where:{id:expired.id}})).status).toBe('EXPIRED');
+    expect((await db.order.findUniqueOrThrow({where:{id:review.id}})).status).toBe('UNDER_REVIEW');
+    await expect(orderService.reserve(userId,raffle.id,[40])).rejects.toThrow();
+    await db.allocation.deleteMany({where:{raffleId:raffle.id}});
+    await db.order.updateMany({where:{raffleId:raffle.id},data:{status:'CANCELLED'}});
+  });
   it('un comprobante requiere revisión y sólo lo carga su propietario',async()=>{
     const o=await orderService.reserve(userId,raffleId,[5]);await orderService.startTransfer(userId,o.id);const receipts=new ReceiptsService(db,directory);const buffer=Buffer.from('%PDF-1.7\ncomprobante-test');
     const r=await receipts.upload(userId,o.id,{buffer,size:buffer.length,mimetype:'application/pdf'} as Express.Multer.File);
@@ -90,5 +112,23 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('integración PostgreSQL aisl
     const token=jwt.sign({sub:admin.id,version:0},config.jwtSecret,{issuer:'halcon-airguns',audience:'halcon-web',algorithm:'HS256',expiresIn:'1h'});
     const result=await request(createApp(db,config,gateway)).post(`/api/admin/orders/${o.id}/resolve`).auth(token,{type:'bearer'}).send({decision:'assign',note:'Intento de asignación de prueba.'});
     expect(result.status).toBe(409);expect((await db.order.findUniqueOrThrow({where:{id:o.id}})).status).toBe('NEEDS_ATTENTION');
+  });
+  it('la recaudación de cada rifa usa sólo pagos confirmados a su importe histórico y es privada',async()=>{
+    const prize=await db.prize.create({data:{name:'Premio recaudación'}});
+    const make=(title:string,status:'ACTIVE'|'FINISHED'|'DRAFT')=>db.raffle.create({data:{title,prizeId:prize.id,totalTickets:100,ticketPriceCents:999900,status}});
+    const first=await make('Primera rifa','ACTIVE'),second=await make('Segunda rifa','FINISHED'),empty=await make('Sin compras','DRAFT');
+    for(const [status,amount] of [['PAID',123400],['PAID',100600],['UNDER_REVIEW',900000],['RESERVED',900000],['PAYMENT_PENDING',900000],['AWAITING_RECEIPT',900000],['REJECTED',900000],['REFUND_PENDING',900000],['REFUNDED',900000]] as const){
+      await db.order.create({data:{userId,raffleId:first.id,numbers:[1],unitPriceCents:amount,amountCents:amount,status,expiresAt:new Date(Date.now()+600000)}});
+    }
+    await db.order.create({data:{userId,raffleId:second.id,numbers:[2],unitPriceCents:87500,amountCents:87500,status:'PAID',expiresAt:new Date(Date.now()+600000)}});
+    const admin=await db.user.findUniqueOrThrow({where:{username:'db-admin'}});
+    const token=(id:string)=>jwt.sign({sub:id,version:0},config.jwtSecret,{issuer:'halcon-airguns',audience:'halcon-web',algorithm:'HS256',expiresIn:'1h'});
+    const app=createApp(db,config,gateway);
+    const response=await request(app).get('/api/admin/raffles').auth(token(admin.id),{type:'bearer'});
+    expect(response.status).toBe(200);
+    const revenue=(id:string)=>response.body.find((r:{id:string})=>r.id===id).revenueCents;
+    expect(revenue(first.id)).toBe(224000);expect(revenue(second.id)).toBe(87500);expect(revenue(empty.id)).toBe(0);
+    expect((await request(app).get('/api/admin/raffles').auth(token(userId),{type:'bearer'})).status).toBe(403);
+    expect((await request(app).get(`/api/raffles/${first.id}`)).body).not.toHaveProperty('revenueCents');
   });
 });
