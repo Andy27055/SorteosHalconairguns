@@ -20,12 +20,15 @@ describe('el cliente encuentra las rifas al abrir el sitio', () => {
     expect(screen.getByText('1 rifa activa')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ELEGIR MIS NÚMEROS/ })).toHaveAttribute('href', '/rifas/test-rifa');
   });
-  it('mantiene disponibles varias rifas y oculta resultados anteriores hasta desplegarlos', () => {
+  it('ordena las activas primero y permite filtrar las compras cerradas', () => {
     state.data = [{ ...raffle, id: 'finished', title: 'Rifa anterior', status: 'FINISHED', winnerNumber: 9 }, raffle, { ...raffle, id: 'segunda', title: 'Segunda rifa' }];
     const { container } = render(<MemoryRouter><RafflesHome /></MemoryRouter>);
     expect(screen.getByText('2 rifas activas')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /ELEGIR MIS NÚMEROS/ })).toHaveLength(2);
-    expect(container.querySelector('details')).not.toHaveAttribute('open');
+    const cards=container.querySelector('.raffle-cards')!;expect(cards.textContent!.indexOf('Rifa activa de prueba')).toBeLessThan(cards.textContent!.indexOf('Rifa anterior'));
+    fireEvent.click(screen.getByRole('button',{name:'Filtrar y ordenar rifas'}));fireEvent.click(screen.getByText('Sólo compras cerradas'));
+    expect(screen.getByRole('heading',{name:'Rifa anterior'})).toBeVisible();expect(screen.queryByRole('heading',{name:'Rifa activa de prueba'})).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'Filtrar y ordenar rifas'}));fireEvent.click(screen.getByText('Sólo activas'));expect(screen.getAllByRole('link',{name:/ELEGIR MIS NÚMEROS/})).toHaveLength(2);
   });
   it('sin rifas activas comunica el estado y no presenta inscripciones falsas', () => {
     state.data = []; render(<MemoryRouter><RafflesHome /></MemoryRouter>);

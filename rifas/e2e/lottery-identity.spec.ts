@@ -38,7 +38,7 @@ test('muestra 00–99 y reemplaza sortear por finalizar',async({page})=>{
  await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();await expect(page.getByRole('button',{name:'FINALIZAR RIFA'})).toBeVisible();await expect(page.getByRole('button',{name:'SORTEAR',exact:true})).toHaveCount(0);await page.getByRole('button',{name:'FINALIZAR RIFA'}).click();await expect(page.getByRole('dialog')).toContainText('Nocturna de la Provincia de Buenos Aires');
 });
 test('el enlace de correo exige confirmación explícita y permite elegir contraseña',async({page})=>{
- await fixture(page);await page.goto('/verificar-correo#enlace-de-prueba');await page.getByRole('checkbox').check();await page.getByLabel('Nueva contraseña').fill('MiClavePropia2026');await page.getByRole('button',{name:'CONFIRMAR MI CORREO'}).click();await expect(page.getByRole('heading',{name:'CORREO CONFIRMADO'})).toBeVisible();
+ await fixture(page);await page.goto('/verificar-correo#enlace-de-prueba');await page.getByRole('checkbox').check();await page.getByLabel('Nueva contraseña',{exact:true}).fill('MiClavePropia2026');await page.getByRole('button',{name:'CONFIRMAR MI CORREO'}).click();await expect(page.getByRole('heading',{name:'CORREO CONFIRMADO'})).toBeVisible();
 });
 test('avisa sobre spam y distingue controles principales de funcionales',async({page})=>{
  await page.setViewportSize({width:390,height:844});await fixture(page);await page.goto('/registro');await expect(page.getByText('¿No encontrás nuestro correo?')).toBeVisible();await expect(page.getByText(/Revisá también la carpeta de spam/)).toBeVisible();

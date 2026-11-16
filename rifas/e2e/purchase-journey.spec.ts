@@ -25,13 +25,13 @@ for(const register of [false,true]){
     await page.setViewportSize({width:390,height:844});await guestJourney(page);await page.goto('/rifas/rifa');
     await page.getByRole('button',{name:'Número 11',exact:true}).click();await page.getByRole('button',{name:'Número 12',exact:true}).click();
     await page.getByLabel('Continuar con los números seleccionados').getByRole('button',{name:'CONTINUAR',exact:false}).click();
-    await expect(page).toHaveURL(/\/ingresar$/);await expect(page.getByText('TUS NÚMEROS ESTÁN APARTADOS')).toBeVisible();await expect(page.getByText('011 · 012')).toBeVisible();
+    await expect(page).toHaveURL(/\/ingresar$/);await expect(page.getByText('TUS NÚMEROS ESTÁN APARTADOS')).toBeVisible();await expect(page.getByText('11 · 12')).toBeVisible();
     await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
     await page.screenshot({path:'playwright-artifacts/guest-hold-mobile.png',fullPage:true});
     if(register){await page.getByRole('link',{name:'Creá tu cuenta',exact:true}).click();await page.getByLabel('Nombre',{exact:true}).fill('Ana');await page.getByLabel('Apellido',{exact:true}).fill('Pérez');await page.getByLabel('Usuario',{exact:true}).fill('cliente');await page.getByLabel('Email',{exact:true}).fill('cliente@example.com');}
     else await page.getByLabel('Usuario o email').fill('cliente');
     await page.getByLabel('Contraseña',{exact:true}).fill('clave-de-prueba-123');await page.getByRole('button',{name:register?'CREAR MI CUENTA':'INGRESAR',exact:false}).click();
-    await expect(page).toHaveURL(/\/compras\/guest-order$/);await expect(page.getByText('011',{exact:true})).toBeVisible();await expect(page.getByText('012',{exact:true})).toBeVisible();
+    await expect(page).toHaveURL(/\/compras\/guest-order$/);await expect(page.getByText('11',{exact:true})).toBeVisible();await expect(page.getByText('12',{exact:true})).toBeVisible();
     await expect(page.getByRole('heading',{name:'DATOS DEL COMPRADOR'})).toBeVisible();
     await page.evaluate(()=>{(document.activeElement as HTMLElement)?.blur();window.scrollTo({top:0,behavior:'instant'});});
     await page.screenshot({path:`playwright-artifacts/guest-${register?'register':'login'}-mobile.png`,fullPage:true});

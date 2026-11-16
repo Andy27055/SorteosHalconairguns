@@ -1,32 +1,36 @@
+import {RefundRequestsService,refundRequestsInclude} from './services/refund-requests.js';
+import {accountDeletionPreview,deleteAccount} from './services/accounts.js';
+import {FreeTicketsService,bindNextFreeTickets} from './services/free-tickets.js';
 import { guestRouter } from './guest-routes.js';
 import { transferAccounts } from './services/transfer-accounts.js';
 import { buyerRouter } from './buyer-routes.js';
 import { queuePurchaseEmail,queueOrderEmail } from './services/purchase-emails.js';
 import { releaseRefundNumbers } from './services/refund-state.js';
 import { Router } from 'express';
-import type { PrismaClient } from './generated/prisma/client.js';
+import type { PrismaClient, Prisma } from './generated/prisma/client.js';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { authLimit as createAuthLimit, networkLimit, receiptCapacity } from './traffic.js';
 import { PublicCache } from './services/public-cache.js';
+import {awardInclude,snapshotAwards,sameAwards} from './services/award-config.js';
 import { LotteryService, publicRaffle } from './services/lottery.js';
 import { activity, recordActivity } from './services/activity.js';
 import { requestVerification, verifyEmail } from './services/verification.js';
-import {cancelRaffle} from './services/raffle-lifecycle.js';
+import {cancelRaffle,activateRaffle} from './services/raffle-lifecycle.js';
 import path from 'node:path';
 import { z } from 'zod';
 import type { AppConfig } from './config.js';
 import { AppError, asyncRoute } from './errors.js';
 import { authentication, requireAdmin, owned, publicUser, issueToken, cookieOptions, isPrimaryAdmin } from './auth.js';
-import { idSchema, registerSchema, loginSchema, raffleSchema, prizeSchema, reservationSchema, reviewSchema, roleSchema, profileSchema, identityFields, buyerSchema } from './schemas.js';
+import { customerRefundSchema, refundRequestReviewSchema, manualFreeTicketsSchema, idSchema, registerSchema, loginSchema, raffleSchema, prizeSchema, reservationSchema, reviewSchema, roleSchema, profileSchema, identityFields, buyerSchema } from './schemas.js';
 import { atomic } from './db.js';
 import { OrdersService, expireOrders, expirable } from './services/orders.js';
 import { PaymentsService, type PaymentGateway, validWebhook } from './services/payments.js';
 import { ReceiptsService } from './services/receipts.js';
 const userSelect = { id: true, username: true, email: true, fullName: true, role: true, adminType:true, active: true, createdAt: true,emailVerifiedAt:true } as const;
 const receiptSelect = { id: true, mimeType: true, size: true, uploadedAt: true, deleteAfter: true, deletedAt: true } as const;
-const orderInclude = { raffle: { include: { prize: true } }, receipts: { select: receiptSelect } } as const;
+const orderInclude = { ...refundRequestsInclude, raffle: { include: { prize: true, ...awardInclude } }, receipts: { select: receiptSelect } } as const;
 export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGateway) {
   const router = Router();
   const publicReads = new PublicCache();
@@ -38,6 +42,7 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   });
   const auth = authentication(db, cfg);
   const orders = new OrdersService(db);
+  const freeTickets = new FreeTicketsService(db);
   router.use('/guest-reservations', guestRouter(db, cfg));
   const payments = new PaymentsService(db, cfg, gateway);
   const receipts = new ReceiptsService(db, cfg.receiptDir);
@@ -100,14 +105,14 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.get('/raffles', asyncRoute(async (_req, res) => {
     res.json(await publicReads.get('catalog', async () => {
       const liveOrder = { NOT: { status: { in: [...expirable] }, expiresAt: { lt: new Date() } } };
-      const list = await db.raffle.findMany({ where: { status: { notIn: ['DRAFT','CANCELLED'] } }, include: { prize: true, allocations: { where: { order: liveOrder }, select: { order: { select: { status: true } } } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+      const list = await db.raffle.findMany({ where: { totalTickets:{gte:10},status: { notIn: ['DRAFT','CANCELLED'] } }, include: { prize: true, ...awardInclude, allocations: { where: { order: liveOrder }, select: { order: { select: { status: true } } } } }, orderBy: { createdAt: 'desc' }, take: 200 });
       return list.map(({ allocations, ...r }) => ({ ...publicRaffle(r), sold: allocations.filter(a => a.order.status === 'PAID').length, available: r.totalTickets - allocations.length }));
     }));
   }));
   router.get('/raffles/:id', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id);
     res.json(await publicReads.get(`detail:${id}`, async () => {
-      const raffle = await db.raffle.findFirst({ where: { id, status: { not: 'DRAFT' } }, include: { prize: true } });
+      const raffle = await db.raffle.findFirst({ where: { id,totalTickets:{gte:10},status: { not: 'DRAFT' } }, include: { prize: true, ...awardInclude } });
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
       return publicRaffle(raffle);
     }));
@@ -115,11 +120,14 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.get('/raffles/:id/availability', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id);
     const data = await publicReads.get(`availability:${id}`, async () => {
-      if (!await db.raffle.findFirst({ where: { id, status: { not: 'DRAFT' } }, select: { id: true } })) throw new AppError(404, 'Rifa no encontrada.');
+      if (!await db.raffle.findFirst({ where: { id,totalTickets:{gte:10},status: { not: 'DRAFT' } }, select: { id: true } })) throw new AppError(404, 'Rifa no encontrada.');
       const items = await db.allocation.findMany({ where: { raffleId: id, order: { NOT: { status: { in: [...expirable] }, expiresAt: { lt: new Date() } } } }, select: { number: true, order: { select: { status: true } } }, orderBy: { number: 'asc' } });
       return items.map(a => ({ number: a.number, status: a.order.status === 'PAID' ? 'PAID' : 'HELD' }));
     }); res.json(data);
   }));
+  router.get('/free-tickets',auth,asyncRoute(async(req,res)=>res.json(await freeTickets.list(req.user!.id))));
+  router.post('/orders/:id/free-tickets',auth,actionLimit,asyncRoute(async(req,res)=>res.json(await freeTickets.redeem(req.user!.id,idSchema.parse(req.params.id)))));
+  router.post('/orders/:id/refund-requests',auth,actionLimit,asyncRoute(async(req,res)=>{const input=customerRefundSchema.parse(req.body);res.status(201).json(await new RefundRequestsService(db).create(req.user!.id,idSchema.parse(req.params.id),input));}));
   router.get('/orders', auth, asyncRoute(async (req, res) => {
     await atomic(db, expireOrders);
     const page = z.coerce.number().int().min(1).max(10000).default(1).parse(req.query.page);
@@ -183,9 +191,11 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   }));
   router.use('/admin', auth, requireAdmin);
   router.use('/admin', buyerRouter(db, cfg));
+  router.get('/admin/refund-requests',asyncRoute(async(req,res)=>{const status=z.enum(['PENDING','APPROVED','REJECTED','CANCELLED']).default('PENDING').parse(req.query.status);const page=z.coerce.number().int().min(1).max(10000).default(1).parse(req.query.page);res.json(await new RefundRequestsService(db).list(status,page));}));
+  router.post('/admin/refund-requests/:id/review',asyncRoute(async(req,res)=>{const input=refundRequestReviewSchema.parse(req.body);res.json(await new RefundRequestsService(db).review(req.user!.id,idSchema.parse(req.params.id),input));}));
   router.get('/admin/stats', asyncRoute(async (_req, res) => {
     const revenue = await db.order.aggregate({ where: { status: 'PAID' }, _sum: { amountCents: true } });
-    res.json({ raffles: await db.raffle.count(), users: await db.user.count({ where: { active: true } }), pendingReviews: await db.order.count({ where: { status: 'UNDER_REVIEW' } }), attention: await db.order.count({ where: { status: 'NEEDS_ATTENTION' } }), revenueCents: revenue._sum.amountCents || 0 });
+    res.json({ raffles: await db.raffle.count({where:{status:{in:['DRAFT','ACTIVE']}}}), users: await db.user.count({ where: { active: true } }), pendingReviews: await db.order.count({ where: { status: 'UNDER_REVIEW' } }), pendingRefundRequests:await db.refundRequest.count({where:{status:'PENDING'}}), pendingRefunds:await db.order.count({where:{refundRequestedAt:{not:null},refundCompletedAt:null,status:{in:['REFUND_PENDING','REJECTED']}}}), attention: await db.order.count({ where: { status: 'NEEDS_ATTENTION' } }), revenueCents: revenue._sum.amountCents || 0 });
   }));
   router.get('/admin/prizes', asyncRoute(async (_req, res) => res.json(await db.prize.findMany({ orderBy: { createdAt: 'desc' } }))));
   router.get('/admin/prizes/:id', asyncRoute(async (req, res) => res.json(await db.prize.findUniqueOrThrow({ where: { id: idSchema.parse(req.params.id) } }))));
@@ -194,26 +204,23 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.delete('/admin/prizes/:id', asyncRoute(async (req,res)=>{const id=idSchema.parse(req.params.id);await atomic(db,async tx=>{const p=await tx.prize.delete({where:{id}});await recordActivity(tx,{data:{actorId:req.user!.id,action:'PRIZE_DELETED',entityId:id,detail:{name:p.name}}});});res.json({ok:true});}));
   router.get('/admin/raffles', asyncRoute(async (_req, res) => {
     const [raffles, totals] = await Promise.all([
-      db.raffle.findMany({ include: { prize: true }, orderBy: { createdAt: 'desc' } }),
+      db.raffle.findMany({ include: { prize: true, ...awardInclude, _count:{select:{orders:true}} }, orderBy: { createdAt: 'desc' } }),
       db.order.groupBy({ by: ['raffleId'], where: { status: 'PAID' }, _sum: { amountCents: true } }),
     ]);
     const revenue = new Map(totals.map(total => [total.raffleId, total._sum.amountCents || 0]));
-    res.json(raffles.map(raffle => ({ ...raffle, revenueCents: revenue.get(raffle.id) || 0 })));
+    res.json(raffles.map(raffle => ({ ...raffle, hasOrders:raffle._count.orders>0, revenueCents: revenue.get(raffle.id) || 0 })));
   }));
-  router.get('/admin/raffles/:id', asyncRoute(async (req, res) => res.json(await db.raffle.findUniqueOrThrow({ where: { id: idSchema.parse(req.params.id) }, include: { prize: true } }))));
+  router.get('/admin/raffles/:id', asyncRoute(async (req, res) => res.json(await db.raffle.findUniqueOrThrow({ where: { id: idSchema.parse(req.params.id) }, include: { prize: true, ...awardInclude } }))));
   router.post('/admin/raffles', asyncRoute(async (req, res) => {
     const input = raffleSchema.parse(req.body);
     if (input.status === 'FINISHED') throw new AppError(400, 'Creá la rifa como borrador o activa.');
-    const digits=input.lotteryDigits===undefined?(input.totalTickets===100?2:null):input.lotteryDigits;
-    if(input.status==='ACTIVE'&&(!digits||input.totalTickets>10**digits))throw new AppError(400,'Antes de activar la rifa, definí cuántas cifras del primer premio se usarán. La fecha prevista es opcional.');
-    res.status(201).json(await atomic(db,async tx=>{const r=await tx.raffle.create({data:{...input,numberStart:0,lotteryDigits:input.lotteryDigits===undefined?(input.totalTickets===100?2:null):input.lotteryDigits}});await recordActivity(tx,{data:{actorId:req.user!.id,action:'RAFFLE_CREATED',entityId:r.id}});return r;}));
+    res.status(201).json(await atomic(db,async tx=>{const {awards,...data}=input;const configured=await snapshotAwards(tx,awards||[{rank:1,prizes:[{prizeId:input.prizeId,quantity:1}]}]);const r=await tx.raffle.create({data:{...data,numberStart:0,openedAt:data.status==='ACTIVE'?new Date():null,awards:{create:configured}},include:awardInclude});if(r.openedAt)await bindNextFreeTickets(tx,r.id,r.openedAt);await recordActivity(tx,{data:{actorId:req.user!.id,action:'RAFFLE_CREATED',entityId:r.id}});return r;}));
   }));
   router.put('/admin/raffles/:id', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id); const input = raffleSchema.parse(req.body);
     res.json(await atomic(db, async tx => {
-      const raffle = await tx.raffle.findUniqueOrThrow({ where: { id } });
+      const raffle = await tx.raffle.findUniqueOrThrow({ where: { id }, include:awardInclude });
       if (raffle.drawnAt||['CLOSING','CANCELLED'].includes(raffle.status)) throw new AppError(409, 'Una rifa cerrada conserva sus datos históricos. Podés cancelarla desde Eliminar rifa.');
-      if(input.status==='ACTIVE'&&(raffle.numberStart===0||raffle.status!=='ACTIVE')&&(!(input.lotteryDigits??raffle.lotteryDigits)||input.totalTickets>10**(input.lotteryDigits??raffle.lotteryDigits!)))throw new AppError(400,'Definí las cifras antes de activar la rifa.');
       const allocated = await tx.allocation.findFirst({ where: { raffleId: id }, orderBy: { number: 'desc' } });
       if (allocated && allocated.number >= raffle.numberStart+input.totalTickets) throw new AppError(409, 'La cantidad no puede dejar afuera números asignados.');
       if(await tx.order.count({where:{raffleId:id}})){
@@ -222,7 +229,16 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
       const pending = await tx.order.count({ where: { raffleId: id, status: { in: ['RESERVED','PAYMENT_PENDING','AWAITING_RECEIPT','UNDER_REVIEW','NEEDS_ATTENTION'] } } });
       if (input.status !== raffle.status && pending) throw new AppError(409, 'Resolvé las compras pendientes antes de cambiar el estado.');
       if (input.status === 'FINISHED' && raffle.status !== 'FINISHED') throw new AppError(409, 'Usá Finalizar rifa para verificar y registrar el resultado oficial.');
-      const updated = await tx.raffle.update({ where: { id }, data: input });
+      const {awards,...data}=input;
+      if(!awards&&data.prizeId!==raffle.prizeId&&raffle.awards.length>1)throw new AppError(400,'Revisá los premios de todos los puestos antes de cambiar el premio principal.');
+      const requested=awards||(data.prizeId!==raffle.prizeId?[{rank:1,prizes:[{prizeId:data.prizeId,quantity:1}]}]:undefined);
+      const existing=raffle.awards.length?raffle.awards:[{rank:1,prizes:[{prizeId:raffle.prizeId,quantity:1}]}];
+      const changed=!!requested&&!sameAwards(requested,existing);
+      if((changed||data.prizeId!==raffle.prizeId)&&await tx.order.count({where:{raffleId:id}}))throw new AppError(409,'Los puestos y premios no pueden cambiar cuando la rifa ya recibió reservas o compras.');
+      const replacement=changed?await snapshotAwards(tx,requested!):null;
+      if(replacement)await tx.raffleAward.deleteMany({where:{raffleId:id}});
+      const updated = await tx.raffle.update({ where: { id }, data:{...data,...(data.status==='ACTIVE'&&!raffle.openedAt?{openedAt:new Date()}:{}),...(replacement?{awards:{create:replacement}}:{})},include:awardInclude });
+      if(!raffle.openedAt&&updated.openedAt)await bindNextFreeTickets(tx,updated.id,updated.openedAt);
       await recordActivity(tx,{ data: { actorId: req.user!.id, action: 'RAFFLE_UPDATED', entityId: id } }); return updated;
     }));
   }));
@@ -231,13 +247,19 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
     const {reason}=z.object({reason:z.string().trim().max(1000).default('')}).parse(req.body||{});
     res.json(await cancelRaffle(db,req.user!.id,id,reason));
   }));
+  router.get('/admin/users/:id/free-tickets',asyncRoute(async(req,res)=>res.json(await freeTickets.list(idSchema.parse(req.params.id)))));
+  router.post('/admin/users/:id/free-tickets/:benefitId/target',asyncRoute(async(req,res)=>{const input=z.object({targetRaffleId:idSchema}).parse(req.body);res.json(await freeTickets.assignPending(req.user!.id,idSchema.parse(req.params.id),idSchema.parse(req.params.benefitId),input.targetRaffleId));}));
+  router.post('/admin/users/:id/free-tickets',asyncRoute(async(req,res)=>{const input=manualFreeTicketsSchema.parse(req.body);res.status(201).json(await freeTickets.grant(req.user!.id,idSchema.parse(req.params.id),input));}));
+  router.post('/admin/raffles/:id/activate',asyncRoute(async(req,res)=>res.json(await activateRaffle(db,req.user!.id,idSchema.parse(req.params.id)))));
   router.post('/admin/raffles/:id/finish',asyncRoute(async(req,res)=>res.json(await new LotteryService(db).finish(req.user!.id,idSchema.parse(req.params.id)))));
   router.post('/admin/raffles/:id/draw',(_req,_res,next)=>next(new AppError(410,'El sorteo aleatorio fue retirado. Usá Finalizar rifa para consultar la Nocturna bonaerense.')));
   router.get('/admin/orders', asyncRoute(async (req, res) => {
-    const status = z.enum(['ALL','UNDER_REVIEW','NEEDS_ATTENTION','PAID','PAYMENT_PENDING','AWAITING_RECEIPT']).default('ALL').parse(req.query.status);
+    const status = z.enum(['ALL','UNDER_REVIEW','NEEDS_ATTENTION','PAID','PAYMENT_PENDING','AWAITING_RECEIPT','REFUND_PENDING','REFUNDED']).default('ALL').parse(req.query.status);
     const page = z.coerce.number().int().min(1).default(1).parse(req.query.page);
-    const where = status === 'ALL' ? {} : { status };
-    res.json({ items: await db.order.findMany({ where, include: { ...orderInclude, user: { select: {...userSelect,dni:true,firstName:true,lastName:true} } }, orderBy: { createdAt: 'desc' }, skip: (page-1)*25, take: 25 }), total: await db.order.count({ where }), page });
+    const where:Prisma.OrderWhereInput = status === 'ALL' ? {} : status==='REFUND_PENDING'
+      ? {refundRequestedAt:{not:null},refundCompletedAt:null,status:{in:['REFUND_PENDING','REJECTED']}}
+      : { status };
+    res.json({ items: await db.order.findMany({ where, include: { ...orderInclude, user: { select: {...userSelect,dni:true,firstName:true,lastName:true} } }, orderBy:status==='REFUND_PENDING'?{refundRequestedAt:'asc'}:status==='REFUNDED'?{refundCompletedAt:'desc'}:{createdAt:'desc'}, skip: (page-1)*25, take: 25 }), total: await db.order.count({ where }), page });
   }));
   router.post('/admin/orders/:id/review', asyncRoute(async (req, res) => { const input = reviewSchema.parse(req.body); res.json(await receipts.review(req.user!.id, idSchema.parse(req.params.id), input.decision, input.note,input.reasonCode)); }));
   router.post('/admin/orders/:id/resolve', asyncRoute(async (req, res) => {
@@ -265,10 +287,19 @@ export function apiRouter(db: PrismaClient, cfg: AppConfig, gateway: PaymentGate
   router.get('/admin/users/:id', asyncRoute(async (req, res) => res.json(await db.user.findUniqueOrThrow({ where: { id: idSchema.parse(req.params.id) }, select: {...userSelect,firstName:true,lastName:true,dni:true,address:true} }))));
   router.get('/admin/users/:id/activity',asyncRoute(async(req,res)=>{const id=idSchema.parse(req.params.id);await db.user.findUniqueOrThrow({where:{id}});const page=z.coerce.number().int().min(1).max(10000).default(1).parse(req.query.page);res.json(await activity(db,id,page));}));
   router.post('/admin/users', asyncRoute(async (req, res) => {
+    const role=z.enum(['USER','ADMIN']).default('USER').parse(req.body.role);
+    if(role==='ADMIN'&&!isPrimaryAdmin(req.user!))throw new AppError(403,'Sólo el administrador principal puede crear cuentas administradoras.');
+    const sendVerification=z.boolean().default(false).parse(req.body.sendVerification);
     const data = registerSchema.parse(req.body); const { password, ...userData } = data;
     const passwordHash=await bcrypt.hash(password,12);
-    res.status(201).json(await atomic(db,async tx=>{const u=await tx.user.create({data:{...userData,passwordHash,...identityFields(userData),role:'USER'},select:userSelect});await recordActivity(tx,{data:{actorId:req.user!.id,action:'ACCOUNT_CREATED',entityId:u.id}});return u;}));
+    res.status(201).json(await atomic(db,async tx=>{
+      const u=await tx.user.create({data:{...userData,passwordHash,...identityFields(userData),role,adminType:role==='ADMIN'?'FUNCTIONAL':null},select:userSelect});
+      if(sendVerification)await tx.emailVerification.create({data:{userId:u.id,email:u.email,expiresAt:new Date(Date.now()+24*3600000)}});
+      await recordActivity(tx,{data:{actorId:req.user!.id,action:role==='ADMIN'?'ADMIN_ACCOUNT_PROVISIONED':'ACCOUNT_CREATED',entityId:u.id}});return u;
+    }));
   }));
+  router.get('/admin/users/:id/deletion-preview',asyncRoute(async(req,res)=>{if(!isPrimaryAdmin(req.user!))throw new AppError(403,'Esta operación está disponible sólo para la administración principal.');res.json(await accountDeletionPreview(db,req.user!.id,idSchema.parse(req.params.id)));}));
+  router.delete('/admin/users/:id/permanent',asyncRoute(async(req,res)=>{if(!isPrimaryAdmin(req.user!))throw new AppError(403,'Esta operación está disponible sólo para la administración principal.');z.object({confirmation:z.literal('CONFIRMAR')}).parse(req.body);res.json(await deleteAccount(db,req.user!.id,idSchema.parse(req.params.id)));}));
   router.put('/admin/users/:id', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id); const data = roleSchema.parse(req.body);
     if (id === req.user!.id && (data.role !== 'ADMIN' || !data.active)) throw new AppError(409, 'No podés quitar tu propio acceso administrativo.');

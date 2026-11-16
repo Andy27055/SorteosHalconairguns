@@ -1,5 +1,17 @@
 # Compradores, bajas, rechazos y reembolsos — 08/11/2026
 
+El cliente puede solicitar devoluciones de números individuales desde Mis números, con aprobación administrativa previa. El cálculo usa su precio pagado, conserva los números restantes y mantiene ocupados los solicitados hasta aprobar. Regla vigente, contratos e historial: [solicitudes y devoluciones parciales](22-SOLICITUDES-Y-DEVOLUCIONES-PARCIALES.md). Devoluciones ahora inicia en «Solicitudes por aprobar» y separa «Aprobadas, pendientes de devolver», «Realizadas» y «Solicitudes rechazadas».
+
+## Acceso visible y sección Devoluciones (15/11/2026)
+
+El menú administrativo ahora usa siete tarjetas con icono, descripción, sección seleccionada y contadores disponibles: Compras y comprobantes, Devoluciones, Rifas, Premios, Participantes, Compradores y Actividad. Conserva el diseño negro/dorado y se adapta a teléfonos de 320/390 px.
+
+**Devoluciones** está separada de la revisión de comprobantes. Ofrece pendientes de todas las rifas, incluidas canceladas, y el historial de realizadas. Los pendientes se ordenan por antigüedad de solicitud; el historial, por fecha de devolución descendente. Cada tarjeta muestra rifa, comprador histórico, DNI, correo, números, importe, medio, motivo y botón **REGISTRAR REEMBOLSO REALIZADO**. Un rechazo por monto incorrecto con devolución pendiente aparece aquí aunque su estado de compra sea REJECTED. No aparecen rechazos sin devolución solicitada. La cuenta desactivada del comprador no impide registrar la devolución por un administrador.
+
+El formulario exige importe efectivamente devuelto, referencia de al menos cinco caracteres y CONFIRMAR. Si el importe es conocido viene precargado y protegido; si se recibió un monto incorrecto debe indicarse cuánto se devolvió realmente. La ayuda explica por qué el botón sigue deshabilitado. Sólo registra una devolución ya realizada por banco o proveedor: no mueve dinero. Al confirmar, desaparece de pendientes, aparece en realizadas y prepara un correo de confirmación. Los envíos continúan sujetos a la configuración y a que los trabajadores estén activos.
+
+Se conserva el acceso anterior desde Compradores por rifa. En «Todas» las compras, una compra con devolución pendiente ofrece **VER EN DEVOLUCIONES**. Se detectaron ocho pendientes reales mediante lectura del API y se comprobó que todos cumplen las condiciones para mostrar la acción. No se registró ni ejecutó ningún reembolso real durante la revisión.
+
 El usuario confirmó que el ingreso al listado de compradores ocurre **al aprobar el pago**, mediante la revisión administrativa de transferencia o la confirmación verificada de Mercado Pago. Elegir números ya los aparta durante la reserva; aprobar mantiene su asignación como venta confirmada y genera el correo de compra. No se consideran compradores las personas que sólo completan sus datos o envían un archivo.
 
 ## Baja desde Compradores

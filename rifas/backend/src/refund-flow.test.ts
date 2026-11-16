@@ -76,6 +76,24 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('baja, rechazo, reembolso y n
     const job=await db.purchaseEmail.findFirstOrThrow({where:{orderId:o.id,kind:'PURCHASE_REJECTED'}});const message=notificationMessage(job.kind,job.payload,cfg.frontendUrl);expect(message.text).toContain('24 a 48 horas');expect((await buyers.pendingRefunds(r.id))).toHaveLength(1);
     await buyers.completeRefund(adminId,o.id,'Devolución del monto realmente recibido',300000);expect((await db.order.findUniqueOrThrow({where:{id:o.id}})).refundAmountCents).toBe(300000);
   });
+  it('permite gestionar reembolsos de una rifa cancelada y un cliente desactivado desde el filtro administrativo',async()=>{
+    const target=await db.user.create({data:{username:'inactive-refund',email:'inactive@example.com',fullName:'Cliente desactivado',active:false,passwordHash:'unused'}});
+    const r=await raffle();await db.raffle.update({where:{id:r.id},data:{status:'CANCELLED'}});
+    const common={userId:target.id,raffleId:r.id,numbers:[1],unitPriceCents:10000,amountCents:10000,expiresAt:new Date(),method:'TRANSFER' as const,buyerEmail:target.email,buyerFirstName:'Cliente',buyerLastName:'Desactivado',buyerDni:'12345678'};
+    const pending=await db.order.create({data:{...common,status:'REFUND_PENDING',refundRequestedAt:new Date(),refundAmountCents:10000}});
+    const rejected=await db.order.create({data:{...common,numbers:[2],status:'REJECTED',refundRequestedAt:new Date()}});
+    const completed=await db.order.create({data:{...common,numbers:[3],status:'REFUNDED',refundRequestedAt:new Date(),refundCompletedAt:new Date(),refundAmountCents:10000}});
+    const unpaid=await db.order.create({data:{...common,numbers:[4],status:'REJECTED'}});
+    const url='/api/admin/orders?status=REFUND_PENDING';
+    expect((await request(app).get(url).auth(token(target.id),{type:'bearer'})).status).toBe(401);
+    expect((await request(app).get(url).auth(token(otherId),{type:'bearer'})).status).toBe(403);
+    const list=await request(app).get(url).auth(token(adminId),{type:'bearer'});expect(list.status).toBe(200);
+    const ids=list.body.items.map((o:{id:string})=>o.id);expect(ids).toEqual(expect.arrayContaining([pending.id,rejected.id]));expect(ids).not.toContain(completed.id);expect(ids).not.toContain(unpaid.id);
+    await request(app).post(`/api/admin/orders/${pending.id}/refund-complete`).auth(token(adminId),{type:'bearer'}).send({confirmation:'CONFIRMAR',reference:'Transferencia devuelta 123',amountCents:10000}).expect(200);
+    const refreshed=await request(app).get(url).auth(token(adminId),{type:'bearer'});expect(refreshed.body.items.some((o:{id:string})=>o.id===pending.id)).toBe(false);
+    const refunded=await request(app).get('/api/admin/orders?status=REFUNDED').auth(token(adminId),{type:'bearer'});expect(refunded.status).toBe(200);expect(refunded.body.items.some((o:{id:string})=>o.id===pending.id)).toBe(true);
+    expect((await db.user.findUniqueOrThrow({where:{id:target.id}})).active).toBe(false);
+  });
   it('datos incorrectos y pago no realizado notifican el motivo sin prometer reembolsos inexistentes',async()=>{
     for(const code of ['INCORRECT_DETAILS','PAYMENT_NOT_MADE']){const r=await raffle();const o=await transfer(r.id,[1],false);await receipts.review(adminId,o.id,'reject',`Motivo confirmado: ${code}`,code);const stored=await db.order.findUniqueOrThrow({where:{id:o.id}});expect(stored.refundRequestedAt).toBeNull();expect((await buyers.pendingRefunds(r.id))).toHaveLength(0);const job=await db.purchaseEmail.findFirstOrThrow({where:{orderId:o.id}});expect(notificationMessage(job.kind,job.payload,cfg.frontendUrl).text).not.toContain('24 a');}
   });
@@ -88,6 +106,6 @@ describe.skipIf(process.env.RUN_DB_TESTS!=='true')('baja, rechazo, reembolso y n
   it('el emisor simulado envía tipos distintos con destinatarios históricos y sin duplicarlos',async()=>{
     const r=await raffle();await transfer(r.id,[1]);const rejected=await transfer(r.id,[2],false);await receipts.review(adminId,rejected.id,'reject','Motivo de rechazo de prueba.');const removed=await transfer(r.id,[3]);const list=await buyers.list(r.id);const buyer=list.buyers[0];await buyers.remove(adminId,r.id,buyer.id,buyer.version);
     await db.user.update({where:{id:userId},data:{email:'new@example.com'}});const messages:{to:string;text:string;messageId:string;subject:string}[]=[];const sender={sendMail:async(message:typeof messages[number])=>{messages.push(message);}};const mailCfg={...cfg,smtpEnabled:true,smtpHost:'smtp.test.invalid',smtpFrom:'sender@example.com'};
-    await Promise.all([new PurchaseEmailWorker(db,mailCfg,sender).process(1000),new PurchaseEmailWorker(db,mailCfg,sender).process(1000)]);expect(new Set(messages.map(m=>m.messageId)).size).toBe(messages.length);expect(messages.every(m=>m.to==='original@example.com')).toBe(true);expect(messages.some(m=>m.subject.includes('rechazada'))).toBe(true);expect(messages.some(m=>m.text.includes('24 a 72 horas hábiles'))).toBe(true);expect(messages.some(m=>m.subject.includes('Reembolso registrado'))).toBe(true);expect((await db.order.findUniqueOrThrow({where:{id:removed.id}})).status).toBe('REFUND_PENDING');
+    await Promise.all([new PurchaseEmailWorker(db,mailCfg,sender).process(1000),new PurchaseEmailWorker(db,mailCfg,sender).process(1000)]);expect(new Set(messages.map(m=>m.messageId)).size).toBe(messages.length);const historicalJobs=await db.purchaseEmail.findMany({include:{order:{select:{userId:true}}}});for(const message of messages){const job=historicalJobs.find(job=>message.messageId.includes(job.orderId));expect(job).toBeDefined();expect(message.to).toBe(job!.toEmail);if(job!.order.userId===userId)expect(message.to).toBe('original@example.com');}expect(messages.some(m=>m.subject.includes('rechazada'))).toBe(true);expect(messages.some(m=>m.text.includes('24 a 72 horas hábiles'))).toBe(true);expect(messages.some(m=>m.subject.includes('Reembolso registrado'))).toBe(true);expect((await db.order.findUniqueOrThrow({where:{id:removed.id}})).status).toBe('REFUND_PENDING');
   });
 });

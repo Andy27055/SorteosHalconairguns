@@ -7,7 +7,7 @@ import { post, downloadPrivateFile } from './api';
 const fixture=vi.hoisted(()=>({reservation:{id:'guest-order',raffleId:'rifa',numbers:[11,12],expiresAt:new Date(Date.now()+600000).toISOString()}}));
 vi.mock('./api',()=>({post:vi.fn(),downloadPrivateFile:vi.fn(),ApiError:class extends Error{fields={};}}));
 vi.mock('./auth',()=>({useAuth:()=>({accept:vi.fn()})}));
-vi.mock('./hooks/useFetch',()=>({useFetch:(url:string)=>({loading:false,error:'',refresh:vi.fn(),data:url.endsWith('/refunds')?[]:url==='/guest-reservations'?{reservation:fixture.reservation}:{raffle:{id:'rifa',title:'Rifa test'},buyers:[{email:'ana@example.com',firstName:'Ana',lastName:'Pérez',dni:'01234567',numbers:[11,12],emailStatuses:['PENDING']}],soldNumbers:2,mailEnabled:false}})}));
+vi.mock('./hooks/useFetch',()=>({useFetch:(url:string)=>({loading:false,error:'',refresh:vi.fn(),data:url.endsWith('/refunds')?[]:url==='/guest-reservations'?{reservation:fixture.reservation}:{raffle:{id:'rifa',title:'Rifa test',totalTickets:1000},buyers:[{email:'ana@example.com',firstName:'Ana',lastName:'Pérez',dni:'01234567',numbers:[11,12],emailStatuses:['PENDING']}],soldNumbers:2,mailEnabled:false}})}));
 describe('continuidad durante autenticación',()=>{
   it('tras ingresar reclama la reserva y abre la misma compra',async()=>{
     vi.mocked(post).mockImplementation(async(url)=>url==='/auth/login'?{user:{id:'user'},token:'test-token'}:{order:{id:'guest-order'}} as never);
@@ -22,7 +22,7 @@ describe('listado por rifa',()=>{
     vi.mocked(downloadPrivateFile).mockResolvedValue(undefined);
     render(<BuyersPanel raffles={[{id:'rifa',title:'Rifa test'} as never]}/>);
     fireEvent.change(screen.getByLabelText('Seleccioná una rifa'),{target:{value:'rifa'}});
-    expect(screen.getByRole('columnheader',{name:'Email'})).toBeInTheDocument();expect(screen.getByText('01234567')).toBeInTheDocument();expect(screen.getByText('11 · 12')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader',{name:'Email'})).toBeInTheDocument();expect(screen.getByText('01234567')).toBeInTheDocument();expect(screen.getByText('011 · 012')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'DESCARGAR EXCEL'}));await waitFor(()=>expect(downloadPrivateFile).toHaveBeenCalledWith('/admin/raffles/rifa/buyers.xlsx','compradores-rifa.xlsx'));
   });
 });

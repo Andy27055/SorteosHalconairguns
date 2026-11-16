@@ -50,7 +50,7 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | POST `/orders/:id/reconcile` | — | U/A | Consulta MP; A puede hacerlo desde panel |
 | GET `/receipts/:id` | id | U/A | Archivo adjunto privado; otro titular 403; vencido 410 |
 | POST `/payments/webhook` | query `data.id`, body payment, headers firmados | Firma MP | 200 después de procesar; inválida 401, fallo 5xx |
-| GET `/admin/stats` | — | A | Cantidades y suma de importes de compras PAID |
+| GET `/admin/stats` | — | A | Rifas sólo DRAFT/ACTIVE, participantes, pendientes y suma de importes PAID; excluye del contador CLOSING/FINISHED/CANCELLED |
 | GET `/admin/prizes` | — | A | Lista premios |
 | GET `/admin/prizes/:id` | id | A | Premio individual |
 | POST `/admin/prizes` | name, description | A | 201 premio |
@@ -68,7 +68,8 @@ P = público; U = participante autenticado, limitado a sus registros; A = admini
 | POST `/admin/raffles` | title, description, prizeId, ticketPriceCents, totalTickets, status, drawAt | A | 201; crear DRAFT o ACTIVE |
 | PUT `/admin/raffles/:id` | mismos campos | A | Validación de asignados, pendientes y resultado |
 | DELETE `/admin/raffles/:id` | id | A | 409 si hay historial de compras |
-| POST `/admin/raffles/:id/finish` | id | A | Verifica Provincia Nocturna de fecha prevista, registra ganador y encola aviso |
+| POST `/admin/raffles/:id/activate` | id | A | Da de alta un borrador válido: DRAFT → ACTIVE, conservando su configuración |
+| POST `/admin/raffles/:id/finish` | id | A | Cierra una activa o actualiza el resultado pendiente; DRAFT devuelve 409 |
 | POST `/admin/raffles/:id/draw` | id | A | Retirado: devuelve 410 |
 | GET `/admin/orders` | status opcional, page; 25 por página | A | Compras con titular y metadatos de comprobantes |
 | POST `/admin/orders/:id/review` | decision: approve/reject; note opcional al aprobar, 5..500 al rechazar; reasonCode opcional | A | Sólo UNDER_REVIEW con TRANSFER; motivo editable, aviso al cliente y devolución pendiente para monto incorrecto |
@@ -125,4 +126,25 @@ Las respuestas de usuario incluyen adminType: PRIMARY, FUNCTIONAL o null. En PUT
 Ver [reglas vigentes y fuente histórica](15-CANCELACION-Y-CIERRE-AUTOMATICO.md).
 # Recaudación por rifa (actualización)
 
+La configuración de varios puestos y premios se documenta en [Puestos y varios premios](18-PUESTOS-Y-VARIOS-PREMIOS.md). POST/PUT de rifas acepta `awards`; las respuestas incluyen sus premios y los resultados por puesto. Los datos de compra ganadora se omiten en las rutas públicas. Las reglas y asignaciones de premios se congelan desde la primera reserva.
+
 `GET /api/admin/raffles` conserva el arreglo de rifas y agrega `revenueCents` a cada elemento: total en centavos de las compras en estado `PAID` de esa rifa. Se usan los importes históricos de las compras, independientemente del precio actual del número. Devuelve cero si no hay pagos confirmados. Órdenes pendientes, rechazadas, dadas de baja o reembolsadas no se suman. Requiere administrador principal o funcional; el importe no se incorpora a las rutas públicas de rifas.
+
+Premios de números gratis: `GET /api/free-tickets` devuelve sólo los beneficios de la cuenta autenticada. `POST /api/orders/:id/free-tickets` canjea una reserva propia con saldo suficiente, confirma su participación e inmoviliza las asignaciones por $0. No recibe importes ni beneficios a acreditar desde el cliente. El tipo `FREE_TICKET` se configura en los premios; ver [contrato y reglas de canje](19-NUMEROS-GRATIS.md). Las participaciones gratuitas aparecen en compradores y no aumentan `revenueCents`.
+
+### Gestión de cuentas de desarrollo (15/11/2026)
+
+- `POST /api/admin/users`: datos de registro más `role` USER/ADMIN (USER predeterminado) y `sendVerification` booleano (false predeterminado). Sólo PRIMARY puede crear ADMIN; se crea FUNCTIONAL aunque el payload intente indicar PRIMARY. FUNCTIONAL conserva el alta de clientes anterior. Devuelve 201 y datos públicos, sin contraseña ni hash. Una verificación solicitada se crea en la misma transacción.
+- `GET /api/admin/users/:id/deletion-preview`: sólo PRIMARY; devuelve `user`, `orders`, `activeOrders`, `activeBenefits`, `canDelete`. Cuenta principal o propia: 409. Inexistente: 404.
+- `DELETE /api/admin/users/:id/permanent`: sólo PRIMARY, JSON `{"confirmation":"CONFIRMAR"}`. Revalida pendientes dentro de la transacción. Devuelve 200 `{"ok":true,"deleted":true}`; pendientes o principal: 409, confirmación inválida: 400. Conserva historial en las rifas; no elimina órdenes ni datos financieros. Sesiones previas dejan de autenticar.
+- `DELETE /api/admin/users/:id` conserva su función anterior de **desactivar**, sin borrar registros. El diálogo ofrece esta alternativa cuando la eliminación está bloqueada por pendientes.
+
+Reglas completas y persistencia: [gestión de cuentas](14-ADMINISTRACION-PRINCIPAL-Y-SPAM.md).
+
+### Devoluciones separadas (15/11/2026)
+
+Solicitud del titular: POST /api/orders/:id/refund-requests, numbers, reason opcional y requestId UUID. Sólo PAID acreditado y rifa activa con plazo abierto. No libera números ni modifica participación antes de aprobar. ADMIN consulta GET /api/admin/refund-requests y decide POST /api/admin/refund-requests/:id/review (decision, note); rechazo exige motivo. Importe calculado por servidor con precio histórico. La aprobación parcial conserva el resto de la compra y crea una devolución vinculada, sin ejecutar movimiento de dinero. Contrato y persistencia completos: [devoluciones parciales](22-SOLICITUDES-Y-DEVOLUCIONES-PARCIALES.md).
+
+`GET /api/admin/orders?status=REFUND_PENDING&page=1` incluye compras REFUND_PENDING y REJECTED con refundRequestedAt no nulo y refundCompletedAt nulo. Ordena por solicitud ascendente. `status=REFUNDED` devuelve historial de devoluciones por fecha de realización descendente. Mantiene paginación de 25 y permisos ADMIN; incluye rifas canceladas y compradores desactivados. Los filtros anteriores se conservan. `GET /api/admin/stats` agrega pendingRefunds con el mismo criterio del filtro de pendientes. La interfaz los utiliza en la tarjeta Devoluciones, independiente de Compras y comprobantes. El registro sigue en `POST /api/admin/orders/:id/refund-complete`; no llama a un banco ni ejecuta movimientos de dinero.
+
+Entrega manual (15/11): `POST /api/admin/users/:id/free-tickets` requiere administrador, destinatario activo, quantity 1–100, targetRaffleId obligatorio, reason opcional y requestId UUID. El destino debe ser un borrador o activa con ventas abiertas. La solicitud es idempotente. `GET /api/free-tickets` incluye origen nulo en entregas manuales, motivo y targetRaffle; availableRaffles contiene como máximo ese destino. Un premio automático vale para la primera rifa que se active después de confirmarlo. Consultas administrativas y asignación de beneficios manuales pendientes: ver [regla vigente](21-NUMEROS-GRATIS-CON-RIFA-ASIGNADA.md). Nuevas rifas requieren 10–10.000 números; diez utilizan una cifra. El cierre espera la Nocturna del día argentino en que se solicita, con fecha fija en los reintentos.

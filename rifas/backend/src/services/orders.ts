@@ -26,6 +26,7 @@ export class OrdersService {
       await expireOrders(tx);
       const raffle = await tx.raffle.findUnique({ where: { id: raffleId } });
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
+      if(raffle.totalTickets<10)throw new AppError(409,'Esta rifa tiene menos de 10 números. El administrador debe corregirla o eliminarla.');
       if (raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta rifa no admite reservas.');
       if(salesClosed(raffle.drawAt))throw new AppError(409,'La venta de números ya cerró para la Nocturna prevista.');
       if (numbers.some(n => !Number.isInteger(n)||n < raffle.numberStart || n >= raffle.numberStart + raffle.totalTickets)) throw new AppError(400, 'Hay números fuera del rango de la rifa.');

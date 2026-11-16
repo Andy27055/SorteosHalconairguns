@@ -24,14 +24,14 @@ async function maintain() {
   catch (error) { console.error('[mantenimiento]', error instanceof Error ? error.message : 'Error'); }
   finally { maintenanceRunning = false; }
 }
-await maintain();
-void sendEmails();
-const timer = setInterval(maintain, 60000);
-const mailTimer = setInterval(sendEmails, 30000);
+if (config.backgroundTasksEnabled) await maintain();
+if (config.backgroundTasksEnabled) void sendEmails();
+const timer = config.backgroundTasksEnabled ? setInterval(maintain, 60000) : undefined;
+const mailTimer = config.backgroundTasksEnabled ? setInterval(sendEmails, 30000) : undefined;
 let closingRunning=false;
 async function finishScheduled(){if(closingRunning)return;closingRunning=true;try{const result=await lottery.runScheduled();if(result.failed)console.error(`[rifas] ${result.failed} cierres no se pudieron procesar. Se reintentarán en el próximo ciclo.`);}catch{console.error('[rifas] No se pudo completar el cierre automático. Se reintentará en el próximo ciclo.');}finally{closingRunning=false;}}
-void finishScheduled();
-const closingTimer=setInterval(finishScheduled,60000);
+if (config.backgroundTasksEnabled) void finishScheduled();
+const closingTimer=config.backgroundTasksEnabled?setInterval(finishScheduled,60000):undefined;
 const server = createApp().listen(config.port, config.host, () => console.log(`Halcón Airguns API: http://localhost:${config.port}`));
 server.on('error', async () => { clearInterval(timer); clearInterval(mailTimer);clearInterval(closingTimer); console.error(`No se pudo abrir el puerto ${config.port}. Revisá PORT o cerrá el otro servidor que lo esté usando.`); await prisma.$disconnect(); process.exit(1); });
 async function close() { clearInterval(timer); clearInterval(mailTimer);clearInterval(closingTimer); server.close(); await prisma.$disconnect(); process.exit(0); }

@@ -8,6 +8,7 @@ dotenv.config({ path: path.join(root, '.env'), quiet: true } as dotenv.DotenvCon
 dotenv.config({ path: path.join(root, '..', '.env'), quiet: true } as dotenv.DotenvConfigOptions);
 export const config = {
   production: process.env.NODE_ENV === 'production',
+  backgroundTasksEnabled: process.env.BACKGROUND_TASKS_ENABLED !== 'false',
   port: Number(process.env.PORT || 3001),
   host: process.env.HOST || '0.0.0.0',
   demoAccessCode: process.env.DEMO_ACCESS_CODE || '',

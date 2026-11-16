@@ -1,3 +1,4 @@
+import {restoreFreeTickets} from './free-tickets.js';
 import { recordActivity } from './activity.js';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
@@ -5,7 +6,7 @@ import type { PrismaClient, Prisma } from '../generated/prisma/client.js';
 import { atomic } from '../db.js';
 import { AppError } from '../errors.js';
 import { queueOrderEmail } from './purchase-emails.js';
-import { releaseRefundNumbers } from './refund-state.js';
+import { releaseRefundNumbers,supersedeRefundRequests } from './refund-state.js';
 export interface BuyerPurchase {id:string;numbers:number[];amountCents:number;method:string|null;paidAt:string|null;updatedAt:string}
 export interface Buyer { email: string; lastName: string; firstName: string; dni: string; numbers: number[]; amountCents: number; incomplete: boolean; emailStatuses: string[];id?:string;version?:string;orders?:BuyerPurchase[] }
 const buyerInclude={user:{select:{id:true,email:true,firstName:true,lastName:true,dni:true}},emails:{where:{kind:'PURCHASE_CONFIRMED'},select:{status:true}}} as const;
@@ -20,7 +21,7 @@ function groupBuyers(orders:BuyerRecord[]){
   }
   return [...grouped.values()].map(b=>({...b,version:createHash('sha256').update(JSON.stringify([b.email,b.firstName,b.lastName,b.dni,b.orders])).digest('hex')})).sort((a,b)=>a.lastName.localeCompare(b.lastName,'es')||a.firstName.localeCompare(b.firstName,'es'));
 }
-export async function paidBuyers(tx:Pick<Prisma.TransactionClient,'order'>,raffleId:string){return groupBuyers(await tx.order.findMany({where:{raffleId,status:'PAID',userId:{not:null}},include:buyerInclude,orderBy:[{paidAt:'asc'},{id:'asc'}]}));}
+export async function paidBuyers(tx:Pick<Prisma.TransactionClient,'order'>,raffleId:string){return groupBuyers(await tx.order.findMany({where:{raffleId,status:'PAID'},include:buyerInclude,orderBy:[{paidAt:'asc'},{id:'asc'}]}));}
 export class BuyersService {
   constructor(private db: PrismaClient) {}
   async list(raffleId: string) {
@@ -31,13 +32,21 @@ export class BuyersService {
   async remove(actorId:string,raffleId:string,anchorOrderId:string,version:string){
     return atomic(this.db,async tx=>{
       const anchor=await tx.order.findUniqueOrThrow({where:{id:anchorOrderId}});
-      if(anchor.raffleId!==raffleId||anchor.status!=='PAID'||!anchor.userId)throw new AppError(409,'La compra ya no figura entre los compradores confirmados. Actualizá el listado.');
+      if(anchor.raffleId!==raffleId||anchor.status!=='PAID')throw new AppError(409,'La compra ya no figura entre los compradores confirmados. Actualizá el listado.');
       const current=await tx.order.findMany({where:{raffleId,userId:anchor.userId,status:'PAID'},include:buyerInclude,orderBy:[{paidAt:'asc'},{id:'asc'}]});
       const buyer=groupBuyers(current).find(b=>b.orders.some(o=>o.id===anchorOrderId));
       if(!buyer||buyer.version!==version)throw new AppError(409,'Las compras del comprador cambiaron. Cerrá la ventana y actualizá el listado antes de confirmar.');
       const now=new Date();
       for(const order of buyer.orders){
+        await supersedeRefundRequests(tx,order.id,'La compra fue dada de baja por administración y su devolución se gestiona desde esa baja.',actorId);
         await releaseRefundNumbers(tx,order.id);
+        await tx.freeTicketBenefit.updateMany({where:{awardPrize:{award:{winnerOrderId:order.id}},revokedAt:null},data:{revokedAt:now}});
+        if(order.method==='FREE_TICKET'){
+          await restoreFreeTickets(tx,order.id,now);
+          await tx.order.update({where:{id:order.id},data:{status:'CANCELLED',reviewedBy:actorId,decisionNote:'Participación gratuita anulada por administración. Se restituyó el beneficio; no corresponde un reembolso de dinero.'}});
+          await queueOrderEmail(tx,order.id,'PURCHASE_REJECTED');
+          continue;
+        }
         await tx.order.update({where:{id:order.id},data:{status:'REFUND_PENDING',refundRequestedAt:now,refundAmountCents:order.amountCents,reviewedBy:actorId,decisionNote:'Baja solicitada por administración. Reembolso en gestión en un plazo estimado de 24 a 72 horas hábiles.'}});
         await tx.purchaseEmail.updateMany({where:{orderId:order.id,kind:'PURCHASE_CONFIRMED',status:{in:['PENDING','FAILED']}},data:{status:'SKIPPED',lastErrorCode:'ORDER_REMOVED'}});
         await queueOrderEmail(tx,order.id,'REFUND_REQUESTED');

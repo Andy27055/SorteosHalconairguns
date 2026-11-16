@@ -10,7 +10,7 @@ export class GuestReservationsService {
   async current(tokenHash: string) {
     return atomic(this.db, async tx => {
       await expireOrders(tx);
-      return tx.order.findFirst({ where: { guestTokenHash: tokenHash, userId: null, status: 'RESERVED' }, select: { id: true, raffleId: true, numbers: true, expiresAt: true } });
+      return tx.order.findFirst({ where: { guestTokenHash: tokenHash, userId: null, status: 'RESERVED' }, select: { id: true, raffleId: true, numbers: true, expiresAt: true, raffle:{select:{totalTickets:true}} } });
     });
   }
   reserve(tokenHash: string, clientHash: string, raffleId: string, numbers: number[]) {
@@ -21,6 +21,7 @@ export class GuestReservationsService {
       if (existing?.status === 'RESERVED' && existing.raffleId === raffleId && existing.numbers.length === numbers.length && existing.numbers.every(n => numbers.includes(n))) return existing;
       const raffle = await tx.raffle.findUnique({ where: { id: raffleId } });
       if (!raffle) throw new AppError(404, 'Rifa no encontrada.');
+      if(raffle.totalTickets<10)throw new AppError(409,'Esta rifa tiene menos de 10 números. El administrador debe corregirla o eliminarla.');
       if (raffle.status !== 'ACTIVE') throw new AppError(409, 'Esta rifa no admite nuevas reservas.');
       if(salesClosed(raffle.drawAt))throw new AppError(409,'La venta de números ya cerró para la Nocturna prevista.');
       if (numbers.some(n => !Number.isInteger(n)||n < raffle.numberStart || n >= raffle.numberStart + raffle.totalTickets)) throw new AppError(400, 'Hay números fuera del rango de esta rifa.');

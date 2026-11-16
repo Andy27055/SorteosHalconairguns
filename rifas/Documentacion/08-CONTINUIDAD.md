@@ -162,3 +162,172 @@ Se reinició la demo para cargar el backend: sesión actual 18660, puerto 3012, 
 Se guardaron los cambios y se cerró la demo (iniciador, API y túnel), dejando el enlace temporal fuera de servicio. Se verificó que sus PID ya no existen y que los puertos 3012, 3011 y 5173 rechazan conexiones. PostgreSQL quedó exited y no hay contenedores activos; se solicitó además el cierre de Docker Desktop. Se eliminó el registro temporal de sesión ya inactiva. Las compras, usuarios, comprobantes y volúmenes se conservan. No se hizo commit, push ni despliegue.
 
 Al retomar: abrir Docker Desktop, ejecutar docker compose -p halcon-airguns up -d db y npm.cmd run demo desde rifas si se necesita acceso desde teléfonos, o npm.cmd run dev para uso local. La demo inicia directamente en el sitio (sin clave extra), genera un enlace nuevo y exige las cuentas habituales para comprar/administrar. SMTP real y cierres automáticos se reanudan al iniciar el servidor. Los últimos cambios incluyen confirmación de cierre de sesión, redirección a /ingresar y recaudación privada por rifa. Última verificación: ambos builds correctos, 84 pruebas PostgreSQL y 49 frontend correctas.
+
+### Varios puestos y premios (14/11/2026)
+
+El usuario confirmó la correspondencia ordinal de la Nocturna bonaerense: primer puesto de rifa con primer resultado oficial, segundo con segundo, etc. Se implementó asistente Datos → Premios por puesto → Revisión. De 1 a 20 puestos, varios premios/unidades por puesto, reutilización del catálogo y creación de premios dentro del asistente. La misma persona o número puede ganar varios puestos. No se exige que sean personas distintas. Los premios creados en línea permanecen en catálogo si luego se cancela el asistente.
+
+Migración 10 aplicada: 202611140001_multiple_awards. Agrega RaffleAward y AwardPrize; cada rifa anterior conserva un primer puesto con su premio, datos de ganador y numeración. Nombres y descripciones de premios se guardan como copia. Se congelan puestos/premios/cantidades desde la primera reserva o compra, tanto en UI como en backend. Se conserva compatibilidad con API y campos históricos de ganador único.
+
+El lector conserva los veinte números oficiales y recupera los de evidencias anteriores almacenadas. El cierre confirma todos los puestos de manera atómica; un número no vendido deja toda la rifa pendiente, sin reemplazos ni avisos parciales. Sigue sin existir una regla para ese caso. Correos por compra ganadora con todos sus puestos/premios; administradores reciben todos los ganadores. Público muestra nombres enmascarados y omite compras ganadoras, DNI y correos.
+
+Respaldo privado validado en .demo/backups/halcon-before-multiple-awards-20261114.dump. Huellas y cantidades de User, Raffle, Order, Allocation, Receipt, PurchaseEmail, RaffleEmail y LotteryDraw coinciden antes/después de migrar. No se alteraron compras ni se enviaron correos reales. Pruebas finales: 82 backend + 52 frontend + 92 PostgreSQL + 14 navegador = 240 correctas; ambos builds correctos. Capturas revisadas a 320 px.
+
+Sólo se utilizó PostgreSQL para migración/pruebas y un preview local de frontend en 5181 con API simulada. No se inició index.ts, ni trabajadores SMTP/cierres reales, ni túnel público. Al terminar se cierran las herramientas temporales para conservar el estado apagado anterior. Ver [documentación vigente de varios premios](18-PUESTOS-Y-VARIOS-PREMIOS.md). No hubo commit, push ni despliegue.
+
+### Prueba local solicitada (14/11/2026)
+
+El usuario pidió probar el nuevo asistente en local. Se inició Docker Desktop, PostgreSQL y npm run dev: web http://localhost:5173, API http://localhost:3011, ambos en loopback. Sesión activa 46782. Se comprobaron web, salud de API y proxy de Vite con HTTP 200.
+
+La revisión automática rechazó el arranque normal porque reactivaba SMTP y cierres reales. Se agregó BACKGROUND_TASKS_ENABLED (true por defecto para conservar el funcionamiento habitual) y se inició únicamente esta sesión con BACKGROUND_TASKS_ENABLED=false, SMTP_ENABLED=false y HOST=127.0.0.1. No se modificó .env. En esta prueba no se inician correo, limpieza ni cierres programados; las operaciones manuales siguen usando la base actual. Los avisos que generen esas operaciones pueden quedar en cola para un inicio normal posterior. Build backend correcto después del cambio. No reiniciar en modo normal ni activar envío externo para esta prueba sin una instrucción que lo autorice.
+
+### Aclaración de cifras automáticas (14/11/2026)
+
+El usuario aclaró que las últimas dos cifras corresponden a rifas de cien números; para mil se usan tres y para diez mil las cuatro. Sustituye la indicación previa de usar siempre dos cifras. Se mantiene 100 como valor predeterminado editable y se calcula `max(2, longitud(totalTickets - 1))`, sin selector manual. Nuevas rifas desde cero: 00–99, 000–999, 0000–9999. Con resultado 1237 ganan 37, 237 y 1237, respectivamente. La regla se aplica a cada puesto oficial, en orden.
+
+El backend deriva y valida las cifras al crear/editar; el cierre comprueba la regla guardada. Se mantiene el bloqueo de reglas desde la primera reserva. Una rifa anterior con cifras nulas o incompatibles requiere revisión y no se modifica automáticamente. Para cantidades intermedias, un resultado fuera del rango queda pendiente igual que un número sin vender: no hay módulo ni reemplazo automático.
+
+Formulario, revisión, condiciones, grilla, selección, listado de compras y compradores reflejan el rango y los ceros iniciales. La reserva anónima consultada informa también la cantidad de números para mostrarla correctamente. El aviso de correo deshabilitado ya no sugiere que falte configurar la cuenta remitente.
+
+Validación de esta revisión: 90 pruebas backend, 54 frontend, 96 PostgreSQL aislado y 6 navegador correctas (246). Ambos builds correctos; web y API responden HTTP 200. Navegador comprueba configuración, resultados y grilla de 1.000/10.000 números a 390/320 px, incluida selección al paginar. Captura de cuatro cifras a 320 px revisada. Los servicios locales siguen activos en la sesión 46782, con los trabajadores y SMTP pausados como arriba. No se modificó .env ni se abrió un túnel público.
+
+### Premios de números gratis (14/11/2026)
+
+Se agregó el tipo de premio FREE_TICKET, configurable en catálogo o desde el asistente, con unidades por puesto. El cierre acredita a la cuenta ganadora un beneficio único por premio, con saldo y registros de canje. Mis números muestra los beneficios y enlaza a la selección habitual; en la compra se canjea por $0 con identidad completa, sin pago ni comprobante. Figura en compradores/Excel, inmoviliza los números y participa en el cierre, sin sumar recaudación. Se envían notificaciones de premio, canje y baja mediante las colas existentes.
+
+Interpretación comunicada de «próxima rifa»: primera que se abra después de confirmar el premio; no cuenta crear borradores ni una rifa ya abierta previamente. Se hizo una consulta opcional sobre esta preferencia y se avanzó con la interpretación indicada al no recibir respuesta. Beneficio válido únicamente para esa rifa. Una cancelación de destino restituye el saldo y lo deja para la siguiente apertura; la baja individual restituye para el mismo destino. Cancelar origen o eliminar la compra ganadora revoca beneficios sin usar. No se genera un reembolso de dinero por participaciones gratuitas. Números adicionales se pagan en otra reserva.
+
+Migraciones 11 y 12 aplicadas con respaldo validado en .demo/backups/halcon-before-free-tickets-20261114.dump. Nuevas tablas FreeTicketBenefit y FreeTicketUse, tipo de premio congelado en AwardPrize, PaymentMethod FREE_TICKET y fecha de primera apertura. Se conserva PAID para participaciones confirmadas; importes cero sólo se permiten con el método FREE_TICKET. No se reinterpretan premios anteriores por su nombre ni se modifican compras históricas. Detalles en [números gratis](19-NUMEROS-GRATIS.md).
+
+Validación: 90 backend + 60 frontend + 102 PostgreSQL + 8 navegador = 260 correctas; ambos builds correctos. Correos de canje y baja validados con remitente simulado, sin envío externo. Se mantienen web 5173 y API 3011; no se modificó .env, ni se abrió un túnel, ni se hizo commit o despliegue.
+
+### Aclaración de vigencia de números gratis (14/11/2026)
+
+El usuario respondió: «Puede usarlo en cualquier rifa posterior». Sustituye la interpretación inicial de destino único descrita arriba. Se eliminó la vinculación automática a la primera apertura. El saldo no vence al dejar pasar rifas y puede repartirse entre varias posteriores. Se verifica la fecha de acreditación frente a la primera apertura de la rifa; se excluyen el origen y las rifas ya abiertas previamente. La API devuelve availableRaffles y la cartera permite elegir cualquiera de las abiertas elegibles. Se actualizaron textos, condiciones y correos. Los targetRaffleId históricos se conservan pero se ignoran como restricción; no se alteran saldos, compras ni usos anteriores, ni se requiere otra migración.
+
+Pruebas nuevas verifican dejar pasar una rifa cerrada, repartir dos números entre otras dos posteriores, ignorar una vinculación histórica y proteger el saldo ante canjes simultáneos en rifas diferentes. La restitución por cancelación o baja vuelve al saldo general para rifas posteriores. Ver [regla vigente](19-NUMEROS-GRATIS.md).
+
+Validación posterior a la aclaración: 90 backend, 60 frontend, 103 PostgreSQL y 2 canjes móviles correctos (255 en esta revisión). Ambos builds correctos. Sin otra migración ni cambios de .env, saldos o compras reales.
+
+### Acciones de borradores (14/11/2026)
+
+El usuario pidió que los borradores no puedan finalizarse porque no empezaron. El listado reemplaza Finalizar rifa por DAR DE ALTA cuando el estado es DRAFT; conserva Editar y Eliminar. Nuevo POST /api/admin/raffles/:id/activate para ambos tipos de administrador: valida la configuración guardada, cambia sólo a ACTIVE, registra openedAt si no existía y actividad RAFFLE_ACTIVATED. No permite reactivar canceladas o rifas con resultado previo. El alta aparece inmediatamente en el catálogo.
+
+LotteryService.requestClose rechaza DRAFT con 409 antes de consultar fuentes, cambiar reservas o enviar avisos. Eliminar borradores conserva el comportamiento de cancelación lógica y el historial. Pruebas PostgreSQL verifican el bloqueo sin efectos, altas por administrador principal/funcional, permisos, conservación de datos, catálogo y no reactivación; navegador verifica botones y alta en escritorio y móvil. No se modifica .env ni se activa, cancela o cierra una rifa real para las pruebas.
+
+Validación de acciones de borradores: 39 pruebas PostgreSQL de ciclo de vida/premios y 7 de navegador correctas; ambos builds correctos. Se comprobaron escritorio de 1280 px, móvil de 320 px, cancelación con Excel previo y cierre anticipado de activas. Web 5173 y salud API 3011 responden HTTP 200.
+
+### Última Nocturna, mínimo diez, entrega manual y filtros (14/11/2026)
+
+El usuario pidió usar la última Nocturna bonaerense publicada al cerrar, no esperar la de esa noche. Sustituye la regla anterior de mismo día/fecha prevista para nuevos cierres. requestClose cierra ventas y fija closingAt; resolve busca hacia atrás desde la última edición posible (21:00 Argentina, lunes a sábado), verificando extractos oficiales y sin saltarse fallos de fuente. Se fija resultDate al seleccionar y no cambia en los reintentos. Si estuvo apagado, el cierre efectivo usa lo último disponible entonces; cierres antiguos ya fechados conservan evidencia. Una consulta real de sólo lectura recuperó 13/11/2026, sorteo 12914 y veinte posiciones. No se cerró ninguna rifa real. Siguen pendientes pagos por revisar, cifras antiguas incompatibles o números premiados sin vender; no se inventan ganadores.
+
+Mínimo 10 y máximo 10.000 números, predeterminado 100. Diez usa 0–9 y una cifra; cien 00–99 y dos; mil tres; diez mil cuatro. Formulario/API/alta rechazan menos de diez. Las pruebas antiguas menores de diez se conservan en administración para cancelar, pero no se publican, reservan ni finalizan; no se cambian compras históricas.
+
+Entrega manual en Administración → Participantes → OTORGAR NÚMEROS GRATIS, disponible para ambos tipos de admin. Cantidad 1–100, motivo opcional y dos vigencias expresamente confirmadas por el usuario: abiertas actuales/futuras o sólo futuras. Solicitud idempotente por actor y requestId, cuenta destinataria activa, registro administrativo y personal. La cartera admite origen manual nulo y muestra cantidad, motivo, vigencia y rifas elegibles; el canje por $0 conserva los controles existentes. No se asignó un beneficio a usuarios reales para validar.
+
+Migración 13 aplicada: 202611140004_manual_free_tickets. Permite AwardPrize nulo con autor/solicitud manual, agrega validFrom/scope/reason/grantKey y conserva la vigencia de beneficios anteriores. Respaldo privado previo validado en .demo/backups/halcon-before-manual-benefits-20261114.dump, 116 entradas de manifiesto. .env y SMTP no se modificaron.
+
+El contador de rifas es ahora un desplegable con la estética negra/dorada: Activas primero, Compras cerradas primero, Sólo activas y Sólo compras cerradas. Incluye finalizadas y pendientes, clasifica por estado/venta vencida y conserva la tarjeta destacada para una única abierta y el anuncio del último ganador. Sin desbordamiento a 320/390 px.
+
+Validación: 99 backend, 63 frontend, 110 PostgreSQL aislado y 13 navegador correctas (285), ambos builds correctos. El último caso del asistente se ajustó para comprobar tanto el límite nativo del formulario como la validación JavaScript y luego se repitieron sus siete casos correctamente. Capturas de filtros y entrega manual revisadas a 320 px. Web 5173, salud API 3011 y catálogo público responden HTTP 200. Continúa la sesión local con correo y trabajadores pausados; sin túnel, commit, push ni despliegue. Ver [reglas y flujo vigentes](20-ULTIMA-NOCTURNA-Y-ENTREGA-MANUAL.md).
+
+### Cierre solicitado por el usuario (14/11/2026)
+
+El usuario pidió guardar y cerrar todo para seguir más tarde. Archivos y documentación guardados en disco, sin commit, push ni despliegue. Se cerró el árbol de procesos de npm/concurrently del proyecto, incluidos tsx/API y Vite. Se creó y verificó un respaldo final privado en .demo/backups/halcon-session-end-20261114-172716.dump (58.587 bytes, 117 entradas de manifiesto). Se detuvo docker compose -p halcon-airguns sin borrar contenedores ni volúmenes; después se cerró Docker Desktop porque no quedaban otros contenedores activos.
+
+Verificación final: sin procesos Node del proyecto ni cloudflared, y sin escuchas en 3011, 5173, 5174, 5181, 3012 ni 5434. La base, comprobantes, configuraciones y compras se conservan. La sesión local queda APAGADA. Al retomar una prueba local, recordar que .env tiene correo real configurado: usar SMTP_ENABLED=false, BACKGROUND_TASKS_ENABLED=false y HOST=127.0.0.1 en la sesión si se desea conservar el modo de pruebas sin correos ni cierres automáticos; no cambiar el .env privado. Los últimos cambios y validaciones son los de la sección anterior y la guía 20.
+
+### Cambio de regla de números gratis (15/11/2026)
+
+El usuario cambió el uso general: un premio ganado vale siempre para la siguiente rifa; una entrega manual requiere elegir entre rifas cargadas, borradores o activas. Sustituye las decisiones de cualquier posterior y scopes generales registradas arriba. Se definió siguiente como primera activación después de confirmar el premio, comunicándolo durante el trabajo. Crear borradores no cuenta. Al crear una activa, activar por PUT o DAR DE ALTA se vinculan beneficios automáticos pendientes en la transacción. El destino no cambia si se deja cerrar esa rifa y se abren otras. La cantidad, los saldos y los usos anteriores se conservan.
+
+La entrega manual exige targetRaffleId; el servidor valida destino en DRAFT o ACTIVE con venta abierta, mínimo diez y sin resultado previo. El selector lista las cargadas y excluye finalizadas/canceladas; un borrador se canjea al activarse, aunque se haya cargado antes de la entrega. Se conservan cantidad, motivo opcional e idempotencia. Los beneficios manuales anteriores sin destino, o cuyo destino fue cancelado, pueden asignarse a una rifa en el mismo diálogo sin duplicar la acreditación ni cambiar usos registrados. Se registran asignaciones en actividad. El canje filtra por destino exacto y ya no por scope/validFrom, conservados sólo como historial. No se requiere migración nueva.
+
+Cancelación: un premio automático ligado al destino cancelado queda pendiente para la próxima apertura como reemplazo; un beneficio manual espera que administración elija un reemplazo cargado. Una baja individual restituye para la misma rifa. Cancelar el origen o retirar la compra ganadora mantiene la revocación de premios automáticos no usados. Cartera, condiciones, correos y etiquetas muestran destino único, espera del borrador y aviso de cierre sin traslado a otras rifas.
+
+Validación: 99 backend + 64 frontend + 111 PostgreSQL + 12 navegador = 286 pruebas correctas; ambos builds correctos. Las pruebas verifican primera apertura, bloqueo en otras rifas, no traslado tras cierre, borrador/activa manual, idempotencia, permisos, destino obligatorio, asignación de saldo anterior y conservación de compras. Navegador prueba entrega manual, canje, catálogo y varios premios a 390/320 px. Captura de cartera con borrador asignado revisada a 320 px. Se consultaron sólo cantidades agregadas de beneficios reales sin destino: cero automáticos y cero manuales. No se asignaron ni canjearon beneficios reales, ni se cambió .env o se enviaron correos.
+
+Sólo se levantó PostgreSQL para esquemas de prueba aislados y Vite temporal en loopback 5181 con API simulada. No se inició la API real ni sus trabajadores. Se cierran Vite, el contenedor de PostgreSQL y Docker Desktop al terminar para conservar el estado apagado anterior. No hay commit, push ni despliegue. Ver [regla vigente](21-NUMEROS-GRATIS-CON-RIFA-ASIGNADA.md).
+
+### Prueba local iniciada a pedido del usuario (15/11/2026)
+
+El usuario pidió probar la página. Se inició Docker Desktop y PostgreSQL, y se dejó npm run dev activo en la sesión 96436: web http://localhost:5173 y API http://localhost:3011, en loopback. Verificados HTTP 200 y contenido válido de página, salud de API, salud mediante proxy de Vite y catálogo real mediante ese proxy.
+
+Sólo para este proceso se establecieron SMTP_ENABLED=false, BACKGROUND_TASKS_ENABLED=false, HOST=127.0.0.1, PORT=3011, FRONTEND_URL=http://localhost:5173, PUBLIC_API_URL=http://localhost:3011 y API_PROXY_TARGET=http://127.0.0.1:3011. No se modificó .env. La cuenta remitente sigue configurada; correo, limpieza y cierres automáticos están pausados. Las acciones manuales de la prueba usan la base local actual y pueden dejar avisos en cola. La sesión queda ENCENDIDA para que el usuario pruebe; no apagarla al terminar esta respuesta.
+
+### Vuelta a Nocturna del día y bloqueo del domingo (15/11/2026)
+
+El usuario pidió volver a la Nocturna del día y preguntó si el modo local impedía enviar correos. Se explicó que el correo sí puede salir desde local, pero la sesión actual lo tiene pausado mediante SMTP_ENABLED=false y BACKGROUND_TASKS_ENABLED=false. Su cuenta remitente y .env siguen configurados e intactos. No se habilita envío real ni se procesan colas por esta consulta.
+
+El cierre fija resultDate al día argentino de closingAt desde el principio. Si falta la publicación espera esa edición, sin buscar días anteriores. Se retiraron el buscador latestNocturna y sus pruebas de fallback, que ya no corresponden a la regla. Los reintentos conservan el día del cierre, incluso tras reiniciar. Los cierres pendientes con fecha nula o del día anterior se normalizan al día de closingAt al resolver y registran RAFFLE_RESULT_DAY_FIXED; las rifas FINISHED conservan sus resultados. No hay migración ni reescritura masiva de datos. Se actualizaron diálogo, estado pendiente, condiciones y correos.
+
+Se verificó el cronograma oficial: lunes a sábado a las 21:00. El usuario eligió explícitamente «Impedir finalizar ese día» para domingos. Nuevos cierres manuales y automáticos se rechazan antes de modificar estado, reservas o avisos. El listado muestra el motivo y deshabilita FINALIZAR RIFA para activas. Se conserva ACTUALIZAR RESULTADO para cierres anteriores y el resto de administración. Se evalúa la fecha argentina, no la UTC. Las pruebas comprueban sábado argentino con UTC domingo, domingo local y lunes.
+
+Los escenarios de premios de PostgreSQL ahora controlan la fecha de prueba en un día hábil con reloj que avanza, para no depender del día real y seguir comprobando el orden de activación. Se cubren espera antes de publicación, fecha fija al reiniciar, normalización pendiente con auditoría y domingo sin efectos. La consulta agregada de la base real devolvió cero cierres pendientes, incluidos cero iniciados en domingo; no se resolvió ni modificó una rifa real para validar. La sesión local sigue encendida y los correos/trabajadores pausados.
+
+Validación final: 95 pruebas backend, 64 frontend, 115 PostgreSQL y 8 navegador correctas (282); ambos builds correctos. El navegador usa lunes simulado para comprobar cierre y alta, y un caso explícito de domingo para verificar botón deshabilitado, aviso y administración disponible. Web 5173 y API mediante proxy responden HTTP 200. npm run dev continúa en la sesión 96436 con SMTP_ENABLED=false y BACKGROUND_TASKS_ENABLED=false; no apagar al terminar. La consulta del usuario sobre correos se respondió como diagnóstico; no autorizó reactivar envío real ni procesar pendientes.
+
+### Contador administrativo de rifas (15/11/2026)
+
+El usuario pidió que el conteo incluya sólo borradores y activas. GET /api/admin/stats calcula raffles con status IN (DRAFT, ACTIVE); excluye CLOSING, FINISHED y CANCELLED. No se borran rifas ni se altera su historial/listado. La tarjeta RIFAS conserva su diseño y su actualización periódica. Prueba PostgreSQL comprueba los cinco estados y que el contador baje al finalizar y cancelar: 25 pruebas del ciclo de vida correctas y build backend correcto. La sesión local permanece encendida con correo y tareas automáticas pausados.
+
+### Gestión de cuentas desde desarrollo (15/11/2026)
+
+El usuario pidió crear y eliminar cuentas y aclaró que sólo se permite borrar sin compras ni premios activos, conservando el historial en las rifas. PRIMARY tiene crear cliente/administrador funcional y eliminar con vista previa y palabra CONFIRMAR en Administración → Participantes. Si hay participaciones en rifas abiertas, reservas, pagos/revisiones, reembolsos pendientes o números gratis no revocados sin usar, sólo se ofrece desactivar. PRIMARY y cuenta propia están protegidos en el backend; los funcionales mantienen sus permisos anteriores.
+
+El borrado conserva órdenes, identidad histórica, números/asignaciones, compradores y Excel, ganador, comprobantes, avisos, beneficios consumidos/revocados y sus usos. Sólo se borra el acceso y verificaciones; se desvinculan relaciones históricas después de congelar los datos disponibles. La actividad conserva la atribución de administradores eliminados. No se sobreescriben identidades de compra con datos posteriores del perfil. Recrear correo/usuario no recupera compras históricas. Revalidación y borrado son atómicos y protegen reservas simultáneas.
+
+Aplicada migración catorce: 202611150001_account_deletion_history (userId nullable de beneficios históricos). Ninguna cuenta real fue creada, eliminada ni modificada para las pruebas. No se enviaron correos ni se modificó .env. La sesión 96436 queda ENCENDIDA para probar en http://localhost:5173; API 3011 y PostgreSQL 5434. SMTP y trabajadores siguen pausados mediante variables del proceso. Detalles en [gestión principal](14-ADMINISTRACION-PRINCIPAL-Y-SPAM.md) y [API](05-API-Y-PERMISOS.md).
+
+Validación de cuentas: ambos builds correctos, 68 pruebas frontend y 135 PostgreSQL en una pasada completa. Tras agregar conservación de autoría, 40 pruebas de cuentas/identidad correctas, incluido el caso nuevo (20 de cuentas). Tres pruebas de Edge verifican creación, confirmación de borrado, protección del principal y permisos funcionales, con teléfonos de 390/320 px sin desborde. Captura eliminar-cuenta-320.png inspeccionada. Los ensayos usan esquemas aislados/API simulada. El lanzador tsx no inicia bajo el sandbox de esta sesión (uv_os_get_passwd); se usó node con Vitest directamente. Una pasada paralela tuvo un trabajador interrumpido; la pasada completa con --maxWorkers=1 finalizó sin errores. No se alteró la configuración de ejecución del producto para las pruebas.
+
+### Cuentas de Andrés y navegación administrativa (15/11/2026)
+
+A pedido del usuario se revisaron las dos cuentas Andres Gomez, usuarios halcon-admin y cliente. Tenían tres gestiones de devolución pendientes, por lo que se desactivaron e invalidaron sesiones, sin borrarlas, siguiendo su regla de no eliminar cuentas con pendientes. Se conservaron sus dieciséis compras y se registró USER_DEACTIVATED. No registrar devoluciones ficticias para permitir su eliminación.
+
+El usuario indicó que sólo veía Ver comprobante, sin botón de devolución, y pidió menú de tarjetas y devoluciones separadas. Se reemplazó la barra por siete tarjetas accesibles (roles tab/tablist conservados). Nueva sección Devoluciones centraliza pendientes y realizadas de todas las rifas; el filtro incluye rechazos por monto incorrecto con refundRequestedAt. Se mantienen aprobación/rechazo de comprobantes y compradores por rifa. Reembolsos de rifas canceladas o cuentas desactivadas pueden registrarse sin reactivar ni modificar el acceso. El formulario explica importe, referencia y CONFIRMAR para habilitar el botón. La compra histórica utiliza su identidad congelada, sin sustituirla por el perfil actual. En listado general existe acceso VER EN DEVOLUCIONES. stats incluye pendingRefunds. No requiere migración.
+
+Lectura del API real mediante Vite: HTTP 200, ocho pendientes y todos elegibles para mostrar acción. Todos son transferencias. No se marcó ningún reembolso real como realizado ni se transfirió dinero o enviaron correos. La sesión local sigue encendida en 5173 / API 3011, con SMTP y trabajadores pausados y .env intacto. El código, pruebas y documentación están guardados localmente; sin commit, publicación ni despliegue.
+
+Validación: builds correctos, 69 pruebas frontend, 20 de cuentas y 25 de ciclo de rifas correctas; 13 de reembolso correctas tras ajustar la prueba de correo para validar destinatarios históricos de varios compradores. Doce recorridos de Edge verificados: tres de cuentas, siete de bajas/rechazos/reembolsos anteriores y dos nuevos de tarjetas/devoluciones. Los dos nuevos recorren pendiente, importe conocido/desconocido, referencia, CONFIRMAR, registro y consulta del historial a 390/320 px, sin desbordes. Capturas menu-administracion-320.png y devolucion-realizada-390.png inspeccionadas. No hay devoluciones reales ejecutadas por estas pruebas.
+
+### Selección de números antes de los premios (15/11/2026)
+
+El usuario pidió mostrar primero la selección de números al abrir una rifa, conservar el nombre arriba y trasladar premios al final. RafflePage mantiene enlace de regreso y título de la rifa al inicio, seguido por grilla/resumen. La descripción y premios por puesto quedan al final, después del resumen. Las rifas antiguas sin awards conservan su premio y descripción en ese bloque inferior. El aviso de saldo gratis se muestra dentro de Tu selección, sin adelantar contenido sobre la grilla. Estados cerrados, resultados, reserva de invitados y barra móvil conservan sus comportamientos.
+
+Compilación frontend correcta y tres recorridos existentes de catálogo/selección móvil correctos a 320/390/430 px. Verificación visual adicional con cinco puestos confirma título antes de grilla, premios después del resumen, primer número visible al entrar, ausencia de desborde y selección operativa en teléfono. Capturas privadas en .demo/raffle-numbers-first-*.png. No se modificaron datos, backend, pagos ni envíos; la sesión local permanece encendida.
+
+### Devolución solicitada por cliente con aprobación y números individuales (15/11/2026)
+
+El usuario pidió solicitar desde Mis números sólo con pago aprobado y rifa activa, y que toda solicitud requiera aprobación administrativa. Confirmó elegir números individuales y cálculo automático. Implementado botón del titular en listado y detalle, selector de números, importe al precio histórico, motivo opcional y estado pendiente. Mientras no se apruebe, conserva PAID, números ocupados y participación. La sección Devoluciones inicia en Solicitudes por aprobar, con revisión de ambos tipos de administrador, aprobación con observación opcional y rechazo con motivo obligatorio. Aprobar libera sólo los números elegidos y autoriza el importe; el dinero se devuelve externamente y se registra luego con referencia/CONFIRMAR. Las compras gratuitas no originan devolución monetaria.
+
+La compra parcial conserva números/importe restantes; parte de devolución vinculada y originalNumbers/originalAmountCents mantienen el pago y alcance originales. Comprobantes y datos históricos conservados; compradores/Excel/recaudación se calculan con participaciones restantes. Conciliación MP valida importe del pago original y puede liquidar partes pendientes si el proveedor confirma devolución total. Cancelar una rifa o dar de baja la compra reemplaza su solicitud pendiente, sin duplicar devolución. Solicitud pendiente impide eliminar la cuenta, pero no desactivarla. Recepción/decisión generan correos idempotentes por solicitud; no se envían con trabajadores pausados. Contexto de auditoría usa números del evento, no el subconjunto restante de la orden.
+
+Migración quince aplicada: 202611150002_customer_refund_requests. No se modificaron compras o devoluciones reales para probar, ni .env, SMTP o trabajadores. API local y Vite siguen activos en 3011/5173. Detalles completos en [solicitudes y devolución parcial](22-SOLICITUDES-Y-DEVOLUCIONES-PARCIALES.md).
+
+Validación: 163 pruebas de PostgreSQL aislado correctas (incluidas 26 nuevas), 95 backend, 72 frontend y builds correctos. La última revisión del contexto de actividad pasó 46 escenarios de solicitudes/identidad. Edge comprueba aprobación parcial a 390 px y rechazo a 320 px; también vuelven a pasar los dos recorridos del panel de devoluciones. Se inspeccionaron las capturas de selección e importe/revisión móvil. Al revisar recorridos antiguos de invitado se detectaron expectativas obsoletas de tres cifras para una rifa de cien números; se actualizaron a dos cifras, sin cambiar el producto. No registrar devoluciones ni solicitudes ficticias en la base local de uso.
+
+### Cierre de la jornada — 15/11/2026
+
+El usuario pidió guardar y cerrar todo. **Estado actual: APAGADO**, reemplaza las notas anteriores que indicaban dejar la sesión encendida. Código y documentación guardados en disco, sin commit, push ni despliegue.
+
+Se detuvo npm run dev (sesión 96436), luego el contenedor halcon-airguns-db-1, conservando su volumen, y finalmente Docker Desktop con su comando de cierre. Verificación final: ningún listener en 3011, 5173, 5434 o 5181; ningún proceso del proyecto, Docker Desktop/backend o cloudflared activo. No se apagó Windows ni se cerró el IDE.
+
+Respaldo privado de PostgreSQL antes de detenerlo: `.demo/backups/halcon-session-end-20261115-40f62966.dump`, formato custom, esquema público, **75.986 bytes**, manifiesto pg_restore comprobado con **117 entradas**. Incluye las quince migraciones y datos actuales de uso. El usuario pudo realizar acciones reales mientras probaba: conservar ese estado y revisar las solicitudes/devoluciones pendientes al retomar. No se aprobó ni completó ninguna devolución real mediante las herramientas para validar el desarrollo.
+
+El archivo .env queda intacto, con el remitente configurado. El proceso anterior tenía SMTP_ENABLED=false y BACKGROUND_TASKS_ENABLED=false: al retomar, mantenerlos pausados hasta que se pida habilitar envíos y tareas. No ejecutar seed ni aprovisionamiento de cuentas, ni procesar automáticamente colas antiguas.
+
+Para retomar en esta carpeta: iniciar Docker Desktop, ejecutar `docker compose -p halcon-airguns up -d db` y luego, en PowerShell:
+
+```powershell
+$env:SMTP_ENABLED='false'
+$env:BACKGROUND_TASKS_ENABLED='false'
+$env:HOST='127.0.0.1'
+$env:PORT='3011'
+$env:FRONTEND_URL='http://localhost:5173'
+$env:PUBLIC_API_URL='http://localhost:3011'
+$env:API_PROXY_TARGET='http://127.0.0.1:3011'
+npm.cmd run dev
+```
+
+Última validación de navegador completada: los recorridos de ingreso y registro conservan 11/12 en una rifa de cien números, con expectativas de dos cifras actualizadas. Se mantienen correctos el nuevo flujo parcial, la aprobación/rechazo y los recorridos anteriores de comprobantes y reembolsos. La revisión final de whitespace no detectó errores. No publicar ni desplegar sin pedido del usuario.

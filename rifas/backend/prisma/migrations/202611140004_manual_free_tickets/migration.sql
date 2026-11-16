@@ -1,0 +1,13 @@
+BEGIN;
+ALTER TABLE "FreeTicketBenefit" ALTER COLUMN "awardPrizeId" DROP NOT NULL;
+ALTER TABLE "FreeTicketBenefit" ADD COLUMN "grantedBy" TEXT;
+ALTER TABLE "FreeTicketBenefit" ADD COLUMN "reason" TEXT;
+ALTER TABLE "FreeTicketBenefit" ADD COLUMN "grantKey" TEXT;
+ALTER TABLE "FreeTicketBenefit" ADD COLUMN "scope" TEXT NOT NULL DEFAULT 'FUTURE' CHECK ("scope" IN ('FUTURE','CURRENT_AND_FUTURE'));
+ALTER TABLE "FreeTicketBenefit" ADD COLUMN "validFrom" TIMESTAMP(3);
+UPDATE "FreeTicketBenefit" SET "validFrom"="createdAt";
+ALTER TABLE "FreeTicketBenefit" ALTER COLUMN "validFrom" SET NOT NULL;
+ALTER TABLE "FreeTicketBenefit" ALTER COLUMN "validFrom" SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "FreeTicketBenefit" ADD CONSTRAINT "FreeTicketBenefit_origin" CHECK ("awardPrizeId" IS NOT NULL OR ("grantedBy" IS NOT NULL AND "grantKey" IS NOT NULL));
+CREATE UNIQUE INDEX "FreeTicketBenefit_grantKey_key" ON "FreeTicketBenefit"("grantKey");
+COMMIT;

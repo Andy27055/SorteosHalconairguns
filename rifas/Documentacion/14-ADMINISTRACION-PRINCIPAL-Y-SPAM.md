@@ -1,5 +1,17 @@
 # Administración principal, funcional y avisos de spam
 
+## Crear y eliminar cuentas (15/11/2026)
+
+Desde **Administración → Participantes**, la cuenta principal de desarrollo tiene **CREAR CUENTA** y **ELIMINAR CUENTA**. Puede crear clientes o administradores funcionales, con nombre, apellido, usuario, correo, contraseña inicial de al menos diez caracteres y DNI opcional. El correo de verificación es opcional; permite al titular verificar su dirección y establecer su propia contraseña. La interfaz no ofrece crear otra cuenta principal. El alta y la eliminación quedan registradas en Actividad.
+
+Para eliminar, se muestra una vista previa con los datos de la cuenta, cantidad de compras históricas, gestiones pendientes y números gratis sin usar. Se exige escribir exactamente `CONFIRMAR`. Sólo se elimina si no tiene reservas, pagos o revisiones pendientes, reembolsos pendientes, compras pagadas en rifas DRAFT/ACTIVE/CLOSING ni beneficios gratuitos no revocados con saldo. En esos casos el diálogo ofrece desactivar; si ya está desactivada, debe resolver los pendientes antes de eliminar. Desactivar conserva cuenta, compras y participaciones, e invalida sus sesiones.
+
+Eliminar sí borra la cuenta y sus solicitudes de verificación. No borra órdenes, números, asignaciones, importes, comprobantes, correos históricos, resultados, beneficios consumidos/revocados ni usos de beneficios. Conserva las identidades registradas al comprar y completa las compras antiguas sin identidad con los datos disponibles del perfil. Desvincula las órdenes y beneficios históricos del acceso eliminado. Los compradores y Excel siguen mostrándolos; recrear el mismo correo o usuario no vincula la nueva cuenta con compras anteriores. Las acciones de un administrador eliminado conservan su nombre en la actividad. La cuenta principal no puede eliminarse ni desactivarse.
+
+Se revalida todo al confirmar, en transacción serializable con reintentos, para proteger compras o premios que aparezcan después de la vista previa. La migración `202611150001_account_deletion_history` sólo permite que un beneficio histórico quede sin cuenta; mantiene su registro, origen y usos. Se aplicó localmente como migración número catorce. No se eliminó ni creó ninguna cuenta real para validar. Los funcionales conservan sus permisos anteriores, sin eliminación definitiva ni promoción a administradores.
+
+La sesión local continúa en web 5173 / API 3011. El archivo .env mantiene su configuración; los envíos y tareas automáticas siguen pausados en el proceso actual. Marcar verificación al crear una cuenta deja una solicitud en cola mientras los trabajadores estén pausados.
+
 Revisión del 12/11/2026. Estado posterior a la guía 13.
 
 ## Cuentas solicitadas

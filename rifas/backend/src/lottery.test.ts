@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {parseNocturna,argentinaDay,publicRaffle,LOTTERY_URL} from './services/lottery.js';
+import {parseNocturna,argentinaDay,nocturnaDay,publicRaffle,LOTTERY_URL} from './services/lottery.js';
 import {salesClosed} from './services/orders.js';
 import {notificationMessage} from './services/purchase-emails.js';
 export function officialHtml(day='12/11/2026',head='5737'){
@@ -7,6 +7,9 @@ export function officialHtml(day='12/11/2026',head='5737'){
  return `<h3>Quiniela Matutina<i></i></h3><span>9999</span><h3>Quiniela Nocturna<i class="fa-solid"></i></h3><div class="datosSorteo"><p class="fechaSorteo">${day}</p><p class="nSorteo">Sorteo N°12913</p><div class="bolillas">${numbers}</div></div><h3>Otro juego</h3>`;
 }
 describe('fuente oficial y fecha argentina',()=>{
+ it('permite el sábado argentino aunque UTC ya sea domingo y bloquea el domingo local',()=>{
+  expect(nocturnaDay(new Date('2026-11-15T02:59:59Z'))).toBe(true);expect(nocturnaDay(new Date('2026-11-15T03:00:00Z'))).toBe(false);expect(nocturnaDay(new Date('2026-11-16T03:00:00Z'))).toBe(true);
+ });
  it('extrae sólo la cabeza nocturna de Provincia y conserva evidencia',()=>{const r=parseNocturna(officialHtml(),'2026-11-12');expect(r.head).toBe('5737');expect(r.drawNumber).toBe('12913');expect(r.sourceUrl).toBe(LOTTERY_URL);expect(r.sourceSha256).toMatch(/^[a-f0-9]{64}$/);expect(r.extract).toContain('5737');});
  it('rechaza resultados de otra fecha',()=>expect(()=>parseNocturna(officialHtml('11/11/2026'),'2026-11-12')).toThrow('todavía'));
  it('rechaza datos provisionales o incompletos',()=>{expect(()=>parseNocturna(officialHtml('12/11/2026','----'),'2026-11-12')).toThrow();expect(()=>parseNocturna(officialHtml().replace('<span>20</span>','<span>19</span>'),'2026-11-12')).toThrow();});

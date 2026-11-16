@@ -17,5 +17,10 @@
 15. [Cancelación, cierre anticipado y finalización automática](15-CANCELACION-Y-CIERRE-AUTOMATICO.md)
 16. [Carga, concurrencia y prueba aislada de 809 usuarios](16-CARGA-Y-CONCURRENCIA.md)
 17. [Demostración temporal desde la PC y teléfonos](17-DEMO-DESDE-PC.md)
+18. [Puestos de la Nocturna y varios premios por rifa](18-PUESTOS-Y-VARIOS-PREMIOS.md)
+19. [Premios de números gratis y rifa asignada](19-NUMEROS-GRATIS.md)
+20. [Última Nocturna, mínimo de diez números, entrega manual y filtros](20-ULTIMA-NOCTURNA-Y-ENTREGA-MANUAL.md)
+21. [Regla vigente: siguiente rifa y destino obligatorio en entregas manuales](21-NUMEROS-GRATIS-CON-RIFA-ASIGNADA.md)
+22. [Solicitudes del cliente y devoluciones parciales por número](22-SOLICITUDES-Y-DEVOLUCIONES-PARCIALES.md)
 
 El análisis original de 111 puntos se conserva como diagnóstico previo. Este índice describe la implementación posterior, no acredita acciones en Trello, GitHub, Discord ni hosting que no se hayan realizado.

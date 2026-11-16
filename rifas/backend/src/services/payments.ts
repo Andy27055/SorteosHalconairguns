@@ -2,7 +2,7 @@ import { recordActivity } from './activity.js';
 import {queueRaffleBuyerEmails} from './raffle-emails.js';
 import { buyerSnapshot } from './buyer-identity.js';
 import { queuePurchaseEmail,queueOrderEmail } from './purchase-emails.js';
-import { releaseRefundNumbers } from './refund-state.js';
+import { releaseRefundNumbers,supersedeRefundRequests } from './refund-state.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { AppConfig } from '../config.js';
@@ -84,7 +84,7 @@ export class PaymentsService {
     if (!payment.external_reference) return;
     return atomic(this.db, async tx => {
       const order = await tx.order.findFirst({ where: { OR: [{ id: payment.external_reference! }, { legacyReference: payment.external_reference! }] } });
-      if (!order) return;
+      if (!order || order.method==='FREE_TICKET') return;
       if((order.refundRequestedAt||order.status==='REFUND_PENDING'||order.status==='REFUNDED')&&(!['refunded','charged_back'].includes(payment.status)||order.method!=='MERCADO_PAGO'||order.paymentId!==String(payment.id))){
         await recordActivity(tx,{data:{action:'PAYMENT_IGNORED_AFTER_REFUND_REQUEST',entityId:order.id,detail:{paymentId:String(payment.id),status:payment.status}}});return;
       }
@@ -95,7 +95,7 @@ export class PaymentsService {
       if (order.paymentId && order.paymentId !== String(payment.id) && ['PAID','REFUND_PENDING','REFUNDED'].includes(order.status)) {
         await recordActivity(tx,{ data: { action: 'DUPLICATE_PAYMENT', entityId: order.id, detail: { paymentId: String(payment.id) } } }); return;
       }
-      if (order.method !== 'MERCADO_PAGO' || payment.currency_id !== 'ARS' || Math.round(Number(payment.transaction_amount) * 100) !== order.amountCents || payment.live_mode !== !this.cfg.mpSandbox) {
+      if (order.method !== 'MERCADO_PAGO' || payment.currency_id !== 'ARS' || Math.round(Number(payment.transaction_amount) * 100) !== (order.originalAmountCents??order.amountCents) || payment.live_mode !== !this.cfg.mpSandbox) {
         await markAttention('El pago no coincide con medio, importe, moneda o entorno de la compra. Requiere conciliación.'); return;
       }
       if (payment.status === 'approved') {
@@ -115,6 +115,12 @@ export class PaymentsService {
         await queuePurchaseEmail(tx, order.id);
         if(raffle.closedEarly&&raffle.status==='CLOSING')await queueRaffleBuyerEmails(tx,order.raffleId,'RAFFLE_EARLY_CLOSURE');
       } else if (['refunded','charged_back'].includes(payment.status)) {
+        await supersedeRefundRequests(tx,order.id,'El proveedor ya registró la devolución del pago original.');
+        // A full provider refund also settles outstanding parts split from this payment.
+        for(const part of await tx.order.findMany({where:{parentOrderId:order.id,status:'REFUND_PENDING',refundCompletedAt:null}})){
+          await tx.order.update({where:{id:part.id},data:{status:'REFUNDED',refundCompletedAt:new Date(),refundAmountCents:part.amountCents,refundReference:`Mercado Pago ${payment.id}`,decisionNote:'El proveedor registró la devolución del pago original.'}});
+          await queueOrderEmail(tx,part.id,'REFUND_COMPLETED');
+        }
         await releaseRefundNumbers(tx,order.id);
         await tx.order.update({ where: { id: order.id }, data: { status: 'REFUNDED', paymentId: String(payment.id), paymentStatus: payment.status,refundRequestedAt:order.refundRequestedAt||new Date(),refundCompletedAt:order.refundCompletedAt||new Date(),refundAmountCents:order.amountCents,refundReference:`Mercado Pago ${payment.id}`,decisionNote:'El proveedor registró la devolución o contracargo de esta compra.' } });
         await queueOrderEmail(tx,order.id,'REFUND_COMPLETED');
@@ -130,8 +136,9 @@ export class PaymentsService {
       await recordActivity(tx,{ data: { action: 'MP_PAYMENT_UPDATED', entityId: order.id, detail: { paymentId: String(payment.id), status: payment.status } } });
     });
   }
-  async reconcile(id: string) {
+  async reconcile(id: string):Promise<void> {
     const order = await this.db.order.findUniqueOrThrow({ where: { id } });
+    if(order.parentOrderId)return this.reconcile(order.parentOrderId);
     const payments = await this.gateway.findPayments(order.legacyReference || id);
     const approved = payments.filter(p => p.status === 'approved');
     // Un intento rechazado no debe liberar los números de otro intento acreditado.

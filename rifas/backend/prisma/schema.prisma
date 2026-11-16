@@ -36,6 +36,11 @@ enum OrderStatus {
 enum PaymentMethod {
   MERCADO_PAGO
   TRANSFER
+  FREE_TICKET
+}
+enum PrizeKind {
+  ITEM
+  FREE_TICKET
 }
 model User {
   id String @id @default(cuid())
@@ -55,13 +60,16 @@ model User {
   createdAt DateTime @default(now())
   orders Order[]
   verifications EmailVerification[]
+  freeTicketBenefits FreeTicketBenefit[]
 }
 model Prize {
   id String @id @default(cuid())
   name String
   description String @default("")
+  kind PrizeKind @default(ITEM)
   createdAt DateTime @default(now())
   raffles Raffle[]
+  awardItems AwardPrize[]
 }
 model Raffle {
   id String @id @default(cuid())
@@ -88,10 +96,41 @@ model Raffle {
   cancellationReason String?
   cancellationBuyers Json?
   createdAt DateTime @default(now())
+  openedAt DateTime?
   orders Order[]
   allocations Allocation[]
   notifications RaffleEmail[]
+  awards RaffleAward[]
+  targetedBenefits FreeTicketBenefit[]
   @@index([status, drawAt])
+}
+
+model RaffleAward {
+  id String @id @default(cuid())
+  raffleId String
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  rank Int
+  winningNumber Int?
+  officialNumber String?
+  winnerOrderId String?
+  winnerOrder Order? @relation("AwardWinner", fields: [winnerOrderId], references: [id], onDelete: Restrict)
+  winnerDisplayName String?
+  prizes AwardPrize[]
+  @@unique([raffleId, rank])
+}
+
+model AwardPrize {
+  id String @id @default(cuid())
+  awardId String
+  award RaffleAward @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  prizeId String
+  prize Prize @relation(fields: [prizeId], references: [id], onDelete: Restrict)
+  name String
+  description String
+  quantity Int @default(1)
+  kind PrizeKind @default(ITEM)
+  benefit FreeTicketBenefit?
+  @@unique([awardId, prizeId])
 }
 enum RaffleEmailKind {
   RAFFLE_CANCELLED
@@ -123,6 +162,13 @@ model LotteryDraw {
 }
 model Order {
   id String @id @default(cuid())
+  parentOrderId String?
+  parentOrder Order? @relation("PartialRefundOrders",fields:[parentOrderId],references:[id],onDelete:Restrict)
+  refundParts Order[] @relation("PartialRefundOrders")
+  originalNumbers Int[] @default([])
+  originalAmountCents Int?
+  refundRequests RefundRequest[] @relation("OrderRefundRequests")
+  approvedRefundRequest RefundRequest? @relation("ApprovedRefundOrder")
   userId String?
   user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
   guestTokenHash String? @unique
@@ -162,9 +208,67 @@ model Order {
   allocations Allocation[]
   receipts Receipt[]
   emails PurchaseEmail[]
+  awardsWon RaffleAward[] @relation("AwardWinner")
+  freeTicketUses FreeTicketUse[]
   @@index([status, expiresAt])
+  @@index([parentOrderId])
   @@index([userId, createdAt])
   @@index([guestClientHash, status, expiresAt])
+}
+enum RefundRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+model RefundRequest {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation("OrderRefundRequests",fields:[orderId],references:[id],onDelete:Restrict)
+  numbers Int[]
+  amountCents Int
+  reason String @default("")
+  status RefundRequestStatus @default(PENDING)
+  requestKey String @unique
+  reviewedBy String?
+  reviewedAt DateTime?
+  decisionNote String?
+  refundOrderId String? @unique
+  refundOrder Order? @relation("ApprovedRefundOrder",fields:[refundOrderId],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status,createdAt])
+  @@index([orderId,createdAt])
+}
+model FreeTicketBenefit {
+  id String @id @default(cuid())
+  userId String?
+  user User? @relation(fields:[userId],references:[id],onDelete:Restrict)
+  awardPrizeId String? @unique
+  awardPrize AwardPrize? @relation(fields:[awardPrizeId],references:[id],onDelete:Restrict)
+  grantedBy String?
+  reason String?
+  grantKey String? @unique
+  scope String @default("FUTURE")
+  validFrom DateTime @default(now())
+  quantity Int
+  remaining Int
+  targetRaffleId String?
+  targetRaffle Raffle? @relation(fields:[targetRaffleId],references:[id],onDelete:Restrict)
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  uses FreeTicketUse[]
+  @@index([userId, revokedAt, remaining])
+}
+model FreeTicketUse {
+  id String @id @default(cuid())
+  benefitId String
+  benefit FreeTicketBenefit @relation(fields:[benefitId],references:[id],onDelete:Restrict)
+  orderId String
+  order Order @relation(fields:[orderId],references:[id],onDelete:Restrict)
+  quantity Int
+  restoredAt DateTime?
+  @@unique([benefitId,orderId])
 }
 enum EmailStatus {
   PENDING
@@ -174,6 +278,9 @@ enum EmailStatus {
   SKIPPED
 }
 enum OrderEmailKind {
+  REFUND_REQUEST_RECEIVED
+  REFUND_REQUEST_APPROVED
+  REFUND_REQUEST_REJECTED
   RAFFLE_WINNER
   PURCHASE_CONFIRMED
   PURCHASE_REJECTED

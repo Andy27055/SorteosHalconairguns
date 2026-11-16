@@ -16,6 +16,7 @@ async function fixture(page:Page,initial='ACTIVE'){
   if(p==='/api/admin/raffles/r/refunds')return json([]);
   if(p==='/api/admin/raffles/r/buyers.xlsx'){events.push('excel');return route.fulfill({contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',body:Buffer.from('PK-fixture-xlsx')});}
   if(p==='/api/admin/raffles/r'&&route.request().method()==='DELETE'){events.push('cancel');reason=route.request().postDataJSON().reason;phase='CANCELLED';return json({ok:true,buyers:1,refundsPending:1});}
+  if(p==='/api/admin/raffles/r/activate'&&route.request().method()==='POST'){events.push('activate');phase='ACTIVE';return json(raffle());}
   if(p==='/api/admin/raffles/r/finish'){events.push('finish');phase='CLOSING';return json(raffle());}
   if(p==='/api/raffles/r')return json(raffle());
   if(p==='/api/raffles/r/availability')return json([{number:37,status:'PAID'}]);
@@ -25,6 +26,13 @@ async function fixture(page:Page,initial='ACTIVE'){
  return {events,get reason(){return reason;}};
 }
 for(const width of [1280,320]){
+ test(`un borrador permite alta y eliminación, sin finalizar, a ${width}px`,async({page})=>{
+  await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));await page.setViewportSize({width,height:900});const state=await fixture(page,'DRAFT');await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();
+  await expect(page.getByRole('button',{name:'FINALIZAR RIFA',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Eliminar',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'DAR DE ALTA',exact:true}).click();await expect(page.getByText('Rifa dada de alta. Ya está disponible para participar.',{exact:true})).toBeVisible();
+  expect(state.events).toEqual(['activate']);await expect(page.getByRole('button',{name:'DAR DE ALTA',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'FINALIZAR RIFA',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ });
  test(`funcional descarga Excel antes de cancelar con motivo a ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:900});const state=await fixture(page);await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();await page.getByRole('button',{name:'Eliminar',exact:true}).click();const dialog=page.getByRole('dialog');await expect(dialog).toContainText('1 comprador');await page.getByLabel('Motivo de cancelación (opcional)').fill('Cambio en la disponibilidad del premio.');
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'DESCARGAR EXCEL ANTES DE ELIMINAR'}).click();expect((await download).suggestedFilename()).toBe('compradores-r.xlsx');await expect(page.getByText('Excel descargado.',{exact:false})).toBeVisible();expect(state.events).toEqual(['excel']);
@@ -32,7 +40,11 @@ for(const width of [1280,320]){
   await page.getByRole('button',{name:'ELIMINAR Y AVISAR'}).click();await expect(dialog).toBeHidden();expect(state.reason).toBe('Cambio en la disponibilidad del premio.');expect(state.events).toEqual(['excel','cancel']);await expect(page.getByText('Rifas canceladas',{exact:true})).toBeVisible();await expect(page.locator('.admin-list-row').filter({hasText:'Rifa de revisión'})).toHaveCount(0);await page.goto('/rifas/r');await expect(page.getByRole('heading',{name:'RIFA CANCELADA'})).toBeVisible();await expect(page.getByText('Cambio en la disponibilidad del premio.')).toBeVisible();
  });
  test(`cierre anticipado disponible para funcional con fecha futura a ${width}px`,async({page})=>{
-  await page.setViewportSize({width,height:900});const state=await fixture(page);await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();await page.getByRole('button',{name:'FINALIZAR RIFA',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Nocturna de hoy');await page.getByRole('button',{name:'CONFIRMAR CIERRE'}).click();await expect(page.getByRole('dialog')).toBeHidden();expect(state.events).toEqual(['finish']);await expect(page.getByRole('button',{name:'ACTUALIZAR RESULTADO'})).toBeVisible();await page.goto('/rifas/r');await expect(page.getByRole('heading',{name:'VENTAS CERRADAS'})).toBeVisible();await expect(page.getByText('Todavía no se publicó la Nocturna.')).toBeVisible();await expect(page.getByRole('button',{name:/Número \d/})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'));await page.setViewportSize({width,height:900});const state=await fixture(page);await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();await page.getByRole('button',{name:'FINALIZAR RIFA',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('Nocturna del día del cierre');await page.getByRole('button',{name:'CONFIRMAR CIERRE'}).click();await expect(page.getByRole('dialog')).toBeHidden();expect(state.events).toEqual(['finish']);await expect(page.getByRole('button',{name:'ACTUALIZAR RESULTADO'})).toBeVisible();await page.goto('/rifas/r');await expect(page.getByRole('heading',{name:'VENTAS CERRADAS'})).toBeVisible();await expect(page.getByText('Todavía no se publicó la Nocturna.')).toBeVisible();await expect(page.getByRole('button',{name:/Número \d/})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  });
 }
 test('permite eliminar una rifa ya finalizada y dejar el motivo vacío',async({page})=>{const state=await fixture(page,'FINISHED');await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();await page.getByRole('button',{name:'Eliminar',exact:true}).click();await expect(page.getByLabel('Motivo de cancelación (opcional)')).not.toHaveAttribute('required','');await page.getByRole('button',{name:'ELIMINAR Y AVISAR'}).click();await expect(page.getByRole('dialog')).toBeHidden();expect(state.reason).toBe('');expect(state.events).toEqual(['cancel']);});
+test('el domingo muestra el motivo y deshabilita finalizar sin bloquear la administración',async({page})=>{
+ await page.clock.setFixedTime(new Date('2026-11-15T18:00:00Z'));const state=await fixture(page);await page.goto('/admin');await page.getByRole('tab',{name:'Rifas',exact:true}).click();
+ await expect(page.getByRole('button',{name:'FINALIZAR RIFA',exact:true})).toBeDisabled();await expect(page.getByText(/Los domingos no hay Nocturna bonaerense y no se pueden iniciar cierres/)).toBeVisible();await expect(page.getByRole('button',{name:'Eliminar',exact:true})).toBeEnabled();expect(state.events).toEqual([]);
+});

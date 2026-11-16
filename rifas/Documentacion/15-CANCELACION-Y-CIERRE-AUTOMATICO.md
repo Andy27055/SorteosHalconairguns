@@ -22,15 +22,21 @@ Las reservas sin pago y pagos pendientes se cancelan. Los comprobantes en revisi
 
 No se ejecutan transferencias bancarias ni reembolsos de Mercado Pago desde la cancelación: el administrador realiza la devolución por el medio original y la registra en el flujo existente. No se cambia la conservación privada de comprobantes de tres meses.
 
+## Dar de alta un borrador
+
+Actualización 14/11/2026: un borrador todavía no empezó y no se puede finalizar. En Administración → Rifas conserva Editar y Eliminar y muestra **DAR DE ALTA** en lugar de Finalizar rifa. `POST /api/admin/raffles/:id/activate`, para administradores principales o funcionales, valida la configuración guardada, cambia DRAFT a ACTIVE y registra la fecha de primera apertura y una actividad legible. No modifica los premios, el precio, la numeración ni las demás reglas. Sólo admite borradores sin resultado previo; una rifa cancelada no puede reactivarse. Al activarse aparece en el catálogo público.
+
 ## Finalizar ahora
 
-`POST /api/admin/raffles/:id/finish` permite solicitar cierre desde DRAFT o ACTIVE, sin exigir que haya llegado la fecha prevista. Sobre CLOSING reintenta el resultado de la fecha ya fijada; sobre FINISHED conserva y devuelve el resultado existente. Una rifa CANCELLED no puede reactivarse mediante esta acción.
+`POST /api/admin/raffles/:id/finish` permite solicitar cierre desde ACTIVE, sin exigir que haya llegado la fecha prevista. Sobre CLOSING reintenta el resultado de la fecha ya fijada; sobre FINISHED conserva y devuelve el resultado existente. Un borrador DRAFT devuelve 409, sin consultar la lotería, modificar reservas ni encolar avisos. Una rifa CANCELLED no puede reactivarse mediante esta acción.
 
-La solicitud cierra las ventas, fija closingAt y resultDate y pasa a CLOSING. Las reservas que seguían sin elegir pago se cancelan y se liberan sus asignaciones. Se conservan los intentos de pago, transferencias pendientes y comprobantes anteriores que necesitan resolución.
+La solicitud cierra las ventas, fija closingAt y resultDate al día argentino del cierre efectivo y pasa a CLOSING. Las reservas que seguían sin elegir pago se cancelan y se liberan sus asignaciones. Se conservan los intentos de pago, transferencias pendientes y comprobantes anteriores que necesitan resolución.
 
-Si el cierre se adelanta a la fecha prevista, se usa la Nocturna bonaerense de ese mismo día en Argentina y se encola un aviso de cierre anticipado a todos los compradores confirmados. Si no había fecha prevista, el cierre manual también toma la Nocturna del día. Las compras anteriores que se acrediten durante CLOSING reciben el aviso anticipado correspondiente, sin repetirlo para un correo ya notificado.
+Actualización 15/11: el usuario pidió volver a la Nocturna del día del cierre. Si todavía no se publicó, se espera esa edición y no se busca un resultado de días anteriores. Si el cierre se adelanta a la fecha prevista, se encola un aviso anticipado a los compradores confirmados. Las compras anteriores que se acrediten durante CLOSING reciben ese aviso sin repetirlo para un correo ya notificado.
 
-En una rifa que ya había vencido se conserva la fecha originalmente prevista, evitando elegir el resultado del día de la intervención. Nunca se cambia de fecha al reintentar o reiniciar el servidor.
+En una rifa vencida que todavía no solicitó cierre se usa el día en que se cierra efectivamente. La fecha no avanza al reintentar o reiniciar. Un cierre pendiente con fecha nula o distinta del día de closingAt se ajusta al día del cierre y deja un registro RAFFLE_RESULT_DAY_FIXED. Las rifas FINISHED devuelven su resultado existente sin alterarlo. El correo y el panel describen la espera de esa Nocturna. La excepción para días sin sorteo se consultó al usuario: el cronograma oficial es de lunes a sábado y no se inventa un resultado para el domingo.
+
+El usuario eligió **impedir finalizar los domingos**. El botón Finalizar rifa queda deshabilitado y se muestra el motivo en administración; la API rechaza 409 antes de cambiar ventas, reservas o avisos. El mismo bloqueo rige al iniciar cierres automáticos. Se permite consultar y resolver cierres que ya se iniciaron en otro día, conservando su fecha. Crear, activar, administrar y cancelar rifas siguen disponibles. El calendario se evalúa en hora argentina, incluso cuando UTC ya cambió de día.
 
 FINISHED sólo se registra cuando se puede verificar el resultado oficial, las compras pendientes están resueltas y el número tiene asignación PAID. Si falta la publicación, una regla de cifras, la resolución de un pago o el número no fue vendido, se conserva CLOSING con una explicación legible. Las ventas permanecen cerradas. La regla de número no vendido sigue sin definir; no se elige otro ganador.
 

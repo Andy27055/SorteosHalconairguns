@@ -14,7 +14,7 @@ export function buyerRouter(db: PrismaClient, cfg: AppConfig) {
   router.post('/orders/:id/refund-complete',asyncRoute(async(req,res)=>{const input=refundCompletionSchema.parse(req.body);res.json(await service.completeRefund(req.user!.id,idSchema.parse(req.params.id),input.reference,input.amountCents));}));
   router.get('/raffles/:id/buyers.xlsx', asyncRoute(async (req, res) => {
     const id = idSchema.parse(req.params.id); const data = await service.list(id);
-    const file = await buyersWorkbook(data.raffle.title, data.buyers,data.raffle.numberStart===0?Math.max(2,String(data.raffle.totalTickets-1).length):3);
+    const file = await buyersWorkbook(data.raffle.title, data.buyers,data.raffle.numberStart===0?Math.max(1,String(data.raffle.totalTickets-1).length):3);
     await recordActivity(db,{ data: { actorId: req.user!.id, action: 'BUYERS_EXPORTED', entityId: id, detail: { buyers: data.buyers.length, numbers: data.soldNumbers } } });
     res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="compradores-${id}.xlsx"`, 'Cache-Control': 'private, no-store' }); res.send(file);
   }));

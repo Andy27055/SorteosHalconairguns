@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Raffle } from '../types';
-import { date, money } from '../types';
+import { date, money, ticketNumber } from '../types';
+import {RafflePrizes,rafflePrizeTitle} from './RafflePrizes';
 
 export function RaffleCard({ raffle: r, featured = false }: { raffle: Raffle; featured?: boolean }) {
   const active = r.status === 'ACTIVE';
@@ -15,11 +16,12 @@ export function RaffleCard({ raffle: r, featured = false }: { raffle: Raffle; fe
         <span className="card-serial">HALCÓN AIRGUNS / RIFAS</span>
       </div>
       <div className="raffle-card-body">
-        <span className="eyebrow">{r.prize.name}</span>
+        <span className="eyebrow">{rafflePrizeTitle(r)}</span>
         <h2 id={titleId}>{r.title}</h2>
         <p className="raffle-description">{r.description || r.prize.description || 'Elegí tus números y compartí la pasión de Halcón Airguns.'}</p>
+        <RafflePrizes raffle={r} compact/>
         {r.winnerNumber != null ? (
-          <div className="winner">NÚMERO GANADOR <strong>{String(r.winnerNumber).padStart(2, '0')}</strong></div>
+          <div className="winner">{(r.awards?.length||0)>1?'NÚMEROS GANADORES':'NÚMERO GANADOR'} <strong>{r.awards&&r.awards.length>1?r.awards.map(a=>String(a.winningNumber).padStart(r.lotteryDigits||2,'0')).join(' · '):ticketNumber(r.winnerNumber!,r)}</strong></div>
         ) : (
           <div className="raffle-price-block">
             <div className="card-price">{money(r.ticketPriceCents)}<small>por número</small></div>
